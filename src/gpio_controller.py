@@ -14,8 +14,8 @@ except (ImportError, RuntimeError):
     logging.warning("RPi.GPIO not available, GPIO features disabled")
 
 if TYPE_CHECKING:
-    from audio_recorder import AudioRecorder
-    from config_manager import ConfigManager
+    from src.audio_recorder import AudioRecorder
+    from src.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +62,7 @@ class GPIOController:
             GPIO.setup(self.led_pin, GPIO.OUT)
             GPIO.output(self.led_pin, GPIO.LOW)
 
-        logger.info(
-            f"GPIO initialized - Button: GPIO{self.button_pin}, LED: GPIO{self.led_pin}"
-        )
+        logger.info(f"GPIO initialized - Button: GPIO{self.button_pin}, LED: GPIO{self.led_pin}")
 
     def _button_pressed(self, channel: int) -> None:
         """Callback for button press"""

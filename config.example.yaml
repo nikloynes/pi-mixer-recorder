@@ -1,8 +1,33 @@
-# Configuration example
-# Fill in with your settings
-# audio.sample_rate: 44100
-# audio.channels: 2
-# recording.local_storage_path: /path/to/store/recordings
-# dropbox.enabled: true
-# dropbox.upload_in_background: false
-# dropbox.delete_local_after_upload: true
+# Audio Configuration
+audio:
+  sample_rate: 48000  # 44100 or 48000
+  channels: 2  # Stereo
+  chunk_size: 1024
+  format: "paInt16"  # 16-bit audio
+  device_index: null  # null = default device, or specify device index
+
+# Recording Configuration
+recording:
+  output_format: "wav"  # wav, flac, or mp3 (requires additional libraries)
+  local_storage_path: "/home/pi/recordings"
+  filename_format: "recording_%Y%m%d_%H%M%S"  # strftime format
+
+# Dropbox Configuration
+dropbox:
+  enabled: true
+  access_token: "YOUR_DROPBOX_ACCESS_TOKEN_HERE"
+  upload_path: "/AudioRecordings"  # Folder in Dropbox
+  delete_local_after_upload: false  # Keep local copies?
+  upload_in_background: true  # Upload while recording or after?
+
+# GPIO Configuration (set to null to disable)
+gpio:
+  button_pin: 17  # GPIO pin for record button
+  led_pin: 27     # GPIO pin for status LED
+  button_bounce_time: 300  # Debounce time in ms
+
+# Web UI Configuration
+web:
+  host: "0.0.0.0"  # Listen on all interfaces
+  port: 5000
+  debug: false

@@ -10,13 +10,10 @@ from threading import Event, Thread
 from typing import TYPE_CHECKING, Optional
 
 import pyaudio
+from loguru import logger
 
-from config_manager import ConfigManager
-
-if TYPE_CHECKING:
-    from dropbox_uploader import DropboxUploader
-
-logger = logging.getLogger(__name__)
+from src.config_manager import ConfigManager
+from src.dropbox_uploader import DropboxUploader
 
 
 class AudioRecorder:
@@ -79,9 +76,7 @@ class AudioRecorder:
         logger.info(f"Starting recording to {filepath}")
 
         # Start recording in separate thread
-        self.recording_thread = Thread(
-            target=self._record_audio, args=(filepath,), daemon=True
-        )
+        self.recording_thread = Thread(target=self._record_audio, args=(filepath,), daemon=True)
         self.recording_thread.start()
 
         return True
@@ -155,9 +150,7 @@ class AudioRecorder:
 
             # Upload to Dropbox if configured
             if self.uploader and self.config.get("dropbox.enabled"):
-                upload_in_background = self.config.get(
-                    "dropbox.upload_in_background", True
-                )
+                upload_in_background = self.config.get("dropbox.upload_in_background", True)
 
                 if upload_in_background:
                     # Upload in separate thread

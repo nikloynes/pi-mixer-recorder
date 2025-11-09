@@ -9,7 +9,7 @@ from typing import Any
 import dropbox
 from dropbox.exceptions import ApiError, AuthError
 
-from config_manager import ConfigManager
+from src.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 

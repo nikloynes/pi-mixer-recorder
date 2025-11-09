@@ -10,11 +10,11 @@ import sys
 from threading import Event
 from typing import Optional
 
-from audio_recorder import AudioRecorder
-from config_manager import ConfigManager
-from dropbox_uploader import DropboxUploader
-from gpio_controller import GPIOController
-from web_interface import create_app
+from src.audio_recorder import AudioRecorder
+from src.config_manager import ConfigManager
+from src.dropbox_uploader import DropboxUploader
+from src.gpio_controller import GPIOController
+from src.web_interface import create_app
 
 # Setup logging
 logging.basicConfig(
@@ -26,10 +26,12 @@ logger = logging.getLogger(__name__)
 # Global shutdown event
 shutdown_event = Event()
 
+
 def signal_handler(signum: int, frame: Optional[object]) -> None:
     """Handle shutdown signals"""
     logger.info("Received shutdown signal, cleaning up...")
     shutdown_event.set()
+
 
 def main() -> None:
     """Main application entry point"""
