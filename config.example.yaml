@@ -1,0 +1,8 @@
+# Configuration example
+# Fill in with your settings
+# audio.sample_rate: 44100
+# audio.channels: 2
+# recording.local_storage_path: /path/to/store/recordings
+# dropbox.enabled: true
+# dropbox.upload_in_background: false
+# dropbox.delete_local_after_upload: true
