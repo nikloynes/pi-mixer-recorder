@@ -2,12 +2,11 @@
 Audio recording functionality
 """
 
-import logging
 import os
 import wave
 from datetime import datetime
 from threading import Event, Thread
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 import pyaudio
 from loguru import logger
@@ -19,18 +18,21 @@ from src.dropbox_uploader import DropboxUploader
 class AudioRecorder:
     """Handles audio recording from USB audio interface"""
 
-    def __init__(self, config: ConfigManager, uploader: Optional["DropboxUploader"] = None) -> None:
+    def __init__(
+        self, config: ConfigManager, uploader: Optional["DropboxUploader"] = None
+    ) -> None:
         """
         Initialize audio recorder
 
         Args:
             config: ConfigManager instance
             uploader: DropboxUploader instance (optional)
+
         """
         self.config = config
         self.uploader = uploader
         self.is_recording = False
-        self.recording_thread: Optional[Thread] = None
+        self.recording_thread: Thread | None = None
         self.stop_event = Event()
 
         # Audio configuration
@@ -38,7 +40,7 @@ class AudioRecorder:
         self.channels: int = config.get("audio.channels", 2)
         self.chunk_size: int = config.get("audio.chunk_size", 1024)
         self.format = pyaudio.paInt16
-        self.device_index: Optional[int] = config.get("audio.device_index")
+        self.device_index: int | None = config.get("audio.device_index")
 
         # Recording configuration
         self.output_path: str = config.get("recording.local_storage_path")
@@ -76,7 +78,9 @@ class AudioRecorder:
         logger.info(f"Starting recording to {filepath}")
 
         # Start recording in separate thread
-        self.recording_thread = Thread(target=self._record_audio, args=(filepath,), daemon=True)
+        self.recording_thread = Thread(
+            target=self._record_audio, args=(filepath,), daemon=True
+        )
         self.recording_thread.start()
 
         return True
@@ -102,6 +106,7 @@ class AudioRecorder:
 
         Args:
             filepath: Path to save recording
+
         """
         frames: list[bytes] = []
         stream = None
@@ -150,11 +155,15 @@ class AudioRecorder:
 
             # Upload to Dropbox if configured
             if self.uploader and self.config.get("dropbox.enabled"):
-                upload_in_background = self.config.get("dropbox.upload_in_background", True)
+                upload_in_background = self.config.get(
+                    "dropbox.upload_in_background", True
+                )
 
                 if upload_in_background:
                     # Upload in separate thread
-                    Thread(target=self._upload_file, args=(filepath,), daemon=True).start()
+                    Thread(
+                        target=self._upload_file, args=(filepath,), daemon=True
+                    ).start()
                 else:
                     self._upload_file(filepath)
 
@@ -167,6 +176,7 @@ class AudioRecorder:
 
         Args:
             filepath: Path to file to upload
+
         """
         try:
             logger.info(f"Uploading {filepath} to Dropbox")

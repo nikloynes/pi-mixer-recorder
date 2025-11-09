@@ -5,3 +5,5 @@ __pycache__/
 .DS_Store
 .env
 config.yaml
+.venv
+.ruff_cache

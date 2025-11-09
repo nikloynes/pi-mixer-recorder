@@ -23,6 +23,7 @@ class DropboxUploader:
 
         Args:
             config: ConfigManager instance
+
         """
         self.config = config
         access_token = config.get("dropbox.access_token")
@@ -49,6 +50,7 @@ class DropboxUploader:
 
         Returns:
             bool: True if successful, False otherwise
+
         """
         try:
             filename = os.path.basename(local_path)
@@ -80,6 +82,7 @@ class DropboxUploader:
 
         Returns:
             list: List of file metadata
+
         """
         try:
             result = self.dbx.files_list_folder(self.upload_path)

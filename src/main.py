@@ -8,7 +8,6 @@ import os
 import signal
 import sys
 from threading import Event
-from typing import Optional
 
 from src.audio_recorder import AudioRecorder
 from src.config_manager import ConfigManager
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 shutdown_event = Event()
 
 
-def signal_handler(signum: int, frame: Optional[object]) -> None:
+def signal_handler(signum: int, frame: object | None) -> None:
     """Handle shutdown signals"""
     logger.info("Received shutdown signal, cleaning up...")
     shutdown_event.set()
@@ -48,7 +47,7 @@ def main() -> None:
         os.makedirs(recordings_path, exist_ok=True)
 
     # Initialize components
-    uploader: Optional[DropboxUploader] = None
+    uploader: DropboxUploader | None = None
     if config.get("dropbox.enabled"):
         try:
             uploader = DropboxUploader(config)
@@ -66,7 +65,7 @@ def main() -> None:
         sys.exit(1)
 
     # Initialize GPIO controller (if configured)
-    gpio: Optional[GPIOController] = None
+    gpio: GPIOController | None = None
     if config.get("gpio.button_pin") is not None:
         try:
             gpio = GPIOController(config, recorder)

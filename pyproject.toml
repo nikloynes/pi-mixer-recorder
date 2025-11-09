@@ -1,46 +1,51 @@
+[lint.isort]
+known-first-party = ["audio_recorder", "config_manager", "dropbox_uploader", "gpio_controller", "web_interface"]
+lint.mccabe.max-complexity = 18
+lint.pep8-naming.classmethod-decorators = ["classmethod"]
+
 [project]
-name = "pi-mixer-recorder"
-version = "0.1.0"
-description = "Raspberry Pi audio recorder for Soundcraft mixer with Dropbox integration"
-readme = "README.md"
-requires-python = ">=3.9"
 dependencies = [
-    "flask>=3.0.0",
-    "pyaudio>=0.2.14",
     "dropbox>=11.36.2",
-    "pyyaml>=6.0.1",
+    "flask>=3.0.0",
     "loguru>=0.7.3",
     "pre-commit>=4.3.0",
+    "pyaudio>=0.2.14",
     "pydantic-settings>=2.11.0",
+    "pyyaml>=6.0.1",
 ]
+description = "Raspberry Pi audio recorder for Soundcraft mixer with Dropbox integration"
+name = "pi-mixer-recorder"
+readme = "README.md"
+requires-python = ">=3.9"
+version = "0.1.0"
 
 [project.optional-dependencies]
-hardware = [
-    "RPi.GPIO>=0.7.1",
-]
-
 dev = [
     "mypy>=1.7.0",
     "ruff>=0.1.6",
     "types-PyYAML>=6.0.12",
 ]
+hardware = [
+    "RPi.GPIO>=0.7.1",
+]
 
 [tool.mypy]
+check_untyped_defs = true
+disallow_any_unimported = false
+disallow_untyped_defs = true
+no_implicit_optional = true
 python_version = "3.9"
+strict_equality = true
+warn_no_return = true
+warn_redundant_casts = true
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_any_unimported = false
-no_implicit_optional = true
-warn_redundant_casts = true
 warn_unused_ignores = true
-warn_no_return = true
-check_untyped_defs = true
-strict_equality = true
 
 [[tool.mypy.overrides]]
-module = ["pyaudio", "RPi.GPIO", "dropbox.*"]
 ignore_missing_imports = true
+module = ["RPi.GPIO", "dropbox.*", "pyaudio"]
+
 [tool.ruff]
 extend-exclude = ["app/migrations/versions/*.py", "docs/*.py"]
 fix = true
@@ -75,11 +80,6 @@ lint.per-file-ignores = {"tests*" = [
     "S101", # Use of `assert` detected,
 ]}
 lint.select = ["ALL"]
-lint.mccabe.max-complexity = 18
-lint.pep8-naming.classmethod-decorators = ["classmethod"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["config_manager", "audio_recorder", "dropbox_uploader", "gpio_controller", "web_interface"]
 
 [tool.tomlsort]
 all = true
@@ -87,4 +87,3 @@ spaces_indent_inline_array = 4
 trailing_comma_inline_array = true
 overrides."project.classifiers".inline_arrays = false
 overrides."tool.coverage.paths.source".inline_arrays = false
-

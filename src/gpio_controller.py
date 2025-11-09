@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 try:
-    import RPi.GPIO as GPIO
+    from RPi import GPIO
 
     GPIO_AVAILABLE = True
 except (ImportError, RuntimeError):
@@ -30,6 +30,7 @@ class GPIOController:
         Args:
             config: ConfigManager instance
             recorder: AudioRecorder instance
+
         """
         if not GPIO_AVAILABLE:
             raise RuntimeError("GPIO not available on this system")
@@ -62,7 +63,9 @@ class GPIOController:
             GPIO.setup(self.led_pin, GPIO.OUT)
             GPIO.output(self.led_pin, GPIO.LOW)
 
-        logger.info(f"GPIO initialized - Button: GPIO{self.button_pin}, LED: GPIO{self.led_pin}")
+        logger.info(
+            f"GPIO initialized - Button: GPIO{self.button_pin}, LED: GPIO{self.led_pin}"
+        )
 
     def _button_pressed(self, channel: int) -> None:
         """Callback for button press"""
@@ -81,6 +84,7 @@ class GPIOController:
 
         Args:
             state: True for on, False for off
+
         """
         if self.led_pin is not None:
             GPIO.output(self.led_pin, GPIO.HIGH if state else GPIO.LOW)
