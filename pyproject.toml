@@ -1,0 +1,25 @@
+[tool.black]
+line-length = 100
+
+[tool.mypy]
+strict = true
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pi-mixer-recorder"
+version = "0.1.0"
+description = "A recorder for Pi Mixer"
+readme = "README.md"
+authors = [
+    { name = "nikloynes", email = "you@example.com" },
+]
+dependencies = [
+    "flask",
+    "pyaudio",
+    "dropbox",
+    "pyyaml",
+    "RPi.GPIO"
+]
