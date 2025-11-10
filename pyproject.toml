@@ -16,7 +16,7 @@ dependencies = [
 description = "Raspberry Pi audio recorder for Soundcraft mixer with Dropbox integration"
 name = "pi-mixer-recorder"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 version = "0.1.0"
 
 [project.optional-dependencies]
@@ -34,7 +34,7 @@ check_untyped_defs = true
 disallow_any_unimported = false
 disallow_untyped_defs = true
 no_implicit_optional = true
-python_version = "3.9"
+python_version = "3.13"
 strict_equality = true
 warn_no_return = true
 warn_redundant_casts = true

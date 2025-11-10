@@ -14,8 +14,8 @@ except (ImportError, RuntimeError):
     logging.warning("RPi.GPIO not available, GPIO features disabled")
 
 if TYPE_CHECKING:
+    from config import ConfigManager
     from src.audio_recorder import AudioRecorder
-    from src.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
