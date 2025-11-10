@@ -117,7 +117,7 @@ class AudioRecorder:
                 frames_per_buffer=self.chunk_size,
             )
 
-            wf = wave.open(filepath, "wb")  # noqa: SIM115
+            wf = wave.open(str(filepath), "wb")  # noqa: SIM115
             wf.setnchannels(self.channels)
             wf.setsampwidth(self.audio.get_sample_size(self.format))
             wf.setframerate(self.sample_rate)
