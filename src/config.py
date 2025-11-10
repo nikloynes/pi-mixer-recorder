@@ -36,6 +36,8 @@ class DropboxSettings(BaseSettings):
 
     enabled: bool = Field(default=True)
     access_token: SecretStr
+    app_key: SecretStr
+    app_secret: SecretStr
     upload_path: str = Field(default="pi_recordings")
     delete_local_after_upload: bool = Field(default=False)
     upload_in_background: bool = Field(default=True)

@@ -19,7 +19,7 @@ settings = get_settings()
 class AudioRecorder:
     """Handles audio recording from USB audio interface."""
 
-    def __init__(self, uploader: Optional["DropboxUploader"] = None) -> None:
+    def __init__(self, uploader: DropboxUploader | None = None) -> None:
         """
         Initialize audio recorder.
 
@@ -82,7 +82,7 @@ class AudioRecorder:
         return True
 
     def stop_recording(self) -> bool:
-        """Stop recording audi."""
+        """Stop recording audio."""
         if not self.is_recording:
             logger.warning("Not currently recording")
             return False

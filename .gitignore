@@ -1,5 +1,3 @@
-# This is a Git ignore file
-# It tells git to ignore certain files and directories
 *.pyc
 __pycache__/
 .DS_Store

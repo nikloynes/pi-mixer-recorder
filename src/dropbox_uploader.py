@@ -17,13 +17,17 @@ class DropboxUploader:
 
     def __init__(self) -> None:
         """Initialise Dropbox uploader."""
-        access_token = settings.dropbox.access_token.get_secret_value()
+        # access_token = settings.dropbox.access_token.get_secret_value()
 
-        if not access_token or access_token == "YOUR_DROPBOX_ACCESS_TOKEN_HERE":  # noqa: S105
-            dropbox_token = "Dropbox access token not configured"  # noqa: S105
-            raise ValueError(dropbox_token)
+        # if not access_token or access_token == "YOUR_DROPBOX_ACCESS_TOKEN_HERE":  # noqa: S105
+        #     dropbox_token = "Dropbox access token not configured"  # noqa: S105
+        #     raise ValueError(dropbox_token)
 
-        self.dbx = dropbox.Dropbox(access_token)
+        self.dbx = dropbox.Dropbox(
+            # app_key=settings.dropbox.app_key,
+            # app_secret=settings.dropbox.app_secret,
+            settings.dropbox.access_token.get_secret_value(),
+        )
         # est the connection
         self.dbx.users_get_current_account()
         logger.info("Successfully connected to Dropbox")
