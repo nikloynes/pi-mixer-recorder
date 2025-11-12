@@ -1,28 +1,31 @@
 audio:
-  sample_rate: 48000  # 44100 or 48000
-  channels: 2  # Stereo
+  sample_rate: 44100  # 44100 or 48000
+  channels: 1
   chunk_size: 1024
-  format: "paInt16"  # 16-bit audio
+  # format: "paInt16"  # 16-bit audio
   device_index: null  # null = default device, or specify device index
 
 recording:
-  output_format: "wav"  # wav, flac, or mp3 (requires additional libraries)
-  local_storage_path: "/home/pi/recordings"
+  output_format: "wav"  # compressed not implemented
+  local_storage_path: "a/path/on/your/pi"
   filename_format: "recording_%Y%m%d_%H%M%S"  # strftime format
 
 dropbox:
   enabled: true
-  access_token: "YOUR_DROPBOX_ACCESS_TOKEN_HERE"
-  upload_path: "/AudioRecordings"  # Folder in Dropbox
+  access_token: "foo"
+  app_key: "bar"
+  app_secret: "baz"
+  refresh_token: "bazball"
+  upload_path: "/pi_recordings"  # Folder in Dropbox
   delete_local_after_upload: false  # Keep local copies?
   upload_in_background: true  # Upload while recording or after?
 
-gpio:
+gpio: # NOT IMPLEMENTED
   button_pin: 17  # GPIO pin for record button
   led_pin: 27     # GPIO pin for status LED
   button_bounce_time: 300  # Debounce time in ms
 
 web:
   host: "0.0.0.0"  # Listen on all interfaces
-  port: 5000
+  port: 5001
   debug: false
