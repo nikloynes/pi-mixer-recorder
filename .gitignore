@@ -6,3 +6,4 @@ config.yaml
 .venv
 .ruff_cache
 pi_mixer_recorder.egg-info
+app.log

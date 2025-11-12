@@ -1,9 +1,9 @@
 """
 Guide:
-1. Create a Dropbox app (Scoped access, production).
-2. Enable "files.content.write" and any needed scopes.
-3. Set redirect type: "Allow implicit grant" OFF; use code flow.
-4. Run this script locally (not on server without browser).
+1. create a Dropbox app on web.
+2. enable "files.content.write" and any needed scopes.
+3. set redirect type: "Allow implicit grant" OFF; use code flow.
+4. run this script locally (not on server without browser).
 """
 
 from dropbox.oauth import DropboxOAuth2FlowNoRedirect
