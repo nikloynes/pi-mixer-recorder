@@ -46,7 +46,7 @@ class DropboxSettings(BaseSettings):
     @field_validator("upload_path", mode="after")
     @classmethod
     def ensure_posix_path(cls, v: str) -> str:
-        """Ensure posix path (trailing /) for upload location."""
+        """Ensure posix path (preceding `/`) for upload location."""
         if v[0] != "/":
             v = "/" + v
         return v
@@ -73,7 +73,7 @@ class Settings(BaseSettings):
 
     audio: AudioSettings = Field(default_factory=AudioSettings)
     recording: RecordingSettings = Field(default_factory=RecordingSettings)
-    dropbox: DropboxSettings = Field(default_factory=DropboxSettings)
+    dropbox: DropboxSettings = Field(default_factory=DropboxSettings)  # type: ignore[arg-type]
     gpio: GPIOSettings = Field(default_factory=GPIOSettings)
     web: WebSettings = Field(default_factory=WebSettings)
 
@@ -100,7 +100,7 @@ class Settings(BaseSettings):
             file_secret_settings,
         )
 
-    def model_post_init(self, __context: object) -> None:
+    def model_post_init(self, __context: object, /) -> None:
         """Post-initialization processing."""
         # Expand home directory in recording path
         self.recording.local_storage_path = Path(

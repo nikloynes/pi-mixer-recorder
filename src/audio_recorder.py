@@ -5,7 +5,6 @@ import wave
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event, Thread
-from typing import Optional
 
 import pyaudio
 from loguru import logger

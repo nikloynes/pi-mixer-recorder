@@ -48,7 +48,7 @@ warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
 ignore_missing_imports = true
-module = ["RPi.GPIO", "dropbox.*", "pyaudio"]
+module = ["RPi.GPIO", "dropbox.*", "loguru", "pyaudio"]
 
 [tool.ruff]
 extend-exclude = ["app/migrations/versions/*.py", "docs/*.py"]
@@ -65,6 +65,7 @@ lint.ignore = [
     "D407", # removed dashes lines under sections
     "D417", # argument description in docstring (unreliable)
     "E501", # long lines, remove later on.
+    "ERA001", # allow commented out code
     "FIX002", # implicit trust that TODOs are not trivial, or else they would be fixed
     "ISC001", # simplify implicit str concatenation (ruff-format recommended)
     "RUF010", # allows casting Path to str using str(path)
