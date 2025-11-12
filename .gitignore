@@ -5,3 +5,4 @@ __pycache__/
 config.yaml
 .venv
 .ruff_cache
+pi_mixer_recorder.egg-info

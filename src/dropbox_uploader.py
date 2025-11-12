@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import dropbox
-from dropbox.exceptions import ApiError
+from dropbox.exceptions import ApiError, AuthError
 from loguru import logger
 
 from src.config import get_settings
@@ -13,68 +13,85 @@ settings = get_settings()
 
 
 class DropboxUploader:
-    """Handles uploading files to Dropbox."""
+    """Handles uploading files to Dropbox with auto refresh support."""
 
     def __init__(self) -> None:
-        """Initialise Dropbox uploader."""
-        # access_token = settings.dropbox.access_token.get_secret_value()
-
-        # if not access_token or access_token == "YOUR_DROPBOX_ACCESS_TOKEN_HERE":  # noqa: S105
-        #     dropbox_token = "Dropbox access token not configured"  # noqa: S105
-        #     raise ValueError(dropbox_token)
-
-        self.dbx = dropbox.Dropbox(
-            # app_key=settings.dropbox.app_key,
-            # app_secret=settings.dropbox.app_secret,
-            settings.dropbox.access_token.get_secret_value(),
-        )
-        # est the connection
-        self.dbx.users_get_current_account()
-        logger.info("Successfully connected to Dropbox")
-
+        """Initialise DropboxUploader."""
+        self.app_key: str = settings.dropbox.app_key.get_secret_value()
+        self.app_secret: str = settings.dropbox.app_secret.get_secret_value()
+        self.access_token: str = settings.dropbox.access_token.get_secret_value()
+        self.refresh_token: str = settings.dropbox.refresh_token.get_secret_value()
         self.upload_path: str = settings.dropbox.upload_path
+        self._dbx: dropbox.Dropbox | None = None
+        self._connect()
+
+    def _connect(self) -> None:
+        """Create Dropbox client (with refresh support if available)."""
+        if not self.access_token and not self.refresh_token:
+            logger.warning("Dropbox disabled: no access or refresh token configured")
+            return
+
+        try:
+            if self.refresh_token and self.app_key and self.app_secret:
+                # Preferred: long-lived via refresh token
+                self._dbx = dropbox.Dropbox(
+                    app_key=self.app_key,
+                    app_secret=self.app_secret,
+                    oauth2_refresh_token=self.refresh_token,  # get this via utils/
+                )
+            else:
+                # Fallback: short-lived access token (will expire)
+                self._dbx = dropbox.Dropbox(oauth2_access_token=self.access_token)
+
+            # Test auth
+            self._dbx.users_get_current_account()
+            logger.info("Connected to Dropbox")
+        except AuthError as e:
+            logger.error(f"Dropbox auth failed: {e}. Configure refresh token.")
+            self._dbx = None
+        except Exception as e:
+            logger.exception(f"Unexpected Dropbox init error: {e}")
+            self._dbx = None
+
+    @property
+    def is_available(self) -> bool:
+        return self._dbx is not None
 
     def upload_file(self, local_path: Path) -> bool:
-        """
-        Upload a file to Dropbox.
-
-        Args:
-            local_path: Local file path to upload
-
-        Returns:
-            bool: True if successful, False otherwise
-
-        """
+        """Upload a file to Dropbox."""
+        if not self.is_available:
+            logger.warning("Dropbox upload skipped: client not available")
+            return False
         try:
             filename = local_path.name
-            dropbox_path = self.upload_path / Path(filename)
-
-            logger.info(f"Uploading {local_path} to Dropbox:{dropbox_path}")
-
-            with Path.open(local_path, "rb") as f:
-                # Upload file (overwrite if exists)
-                self.dbx.files_upload(
-                    f.read(),
-                    dropbox_path,
-                    mode=dropbox.files.WriteMode("overwrite"),
+            dropbox_path = f"{self.upload_path.rstrip('/')}/{filename}"
+            logger.info(f"Uploading {local_path} -> {dropbox_path}")
+            with local_path.open("rb") as f:
+                self._dbx.files_upload(
+                    f.read(), dropbox_path, mode=dropbox.files.WriteMode("overwrite")
                 )
-
-            logger.info(f"Successfully uploaded {filename} to Dropbox")
+            logger.info(f"Uploaded {filename}")
             return True
-
+        except AuthError as e:
+            logger.error(f"Auth error during upload: {e} (maybe token expired)")
+            return False
         except ApiError as e:
             logger.error(f"Dropbox API error: {e}")
             return False
         except Exception as e:
-            logger.error(f"Error uploading file: {e}")
+            logger.error(f"Upload error: {e}")
             return False
 
     def list_files(self) -> Any:
-        """
-        List files in the Dropbox upload folder.
-
-        Returns:
-            list: List of file metadata
-
-        """
-        return self.dbx.files_list_folder(self.upload_path)
+        """List files in the Dropbox folder."""
+        if not self.is_available:
+            logger.warning("Dropbox list skipped: client not available")
+            return []
+        try:
+            return self._dbx.files_list_folder(self.upload_path)
+        except AuthError as e:
+            logger.error(f"Auth error listing files: {e}")
+            return []
+        except Exception:
+            logger.exception("Error listing Dropbox files")
+            return []

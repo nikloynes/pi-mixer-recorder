@@ -11,7 +11,7 @@ from src.audio_recorder import AudioRecorder
 from src.config import get_settings
 from src.dropbox_uploader import DropboxUploader
 
-# from src.gpio_controller import GPIOController
+# from src.gpio_controller import GPIOController # noqa: ERA001
 from src.web_interface import create_app
 
 settings = get_settings()
@@ -22,7 +22,7 @@ recorder = AudioRecorder(uploader=uploader)
 shutdown_event = Event()
 
 
-def signal_handler(signum: int, frame: object | None) -> None:
+def signal_handler(signum: int, frame: object | None) -> None:  # noqa: ARG001
     """Handle shutdown signals."""
     logger.info("Received shutdown signal, cleaning up...")
     cleanup()
@@ -46,10 +46,10 @@ def main() -> None:
     if recordings_path:
         Path.mkdir(recordings_path, exist_ok=True)
 
-    # init GPIO if required! s
+    # init GPIO if required!
 
-    # Setup signal handlers
-    # Let Flask handle Ctrl+C (SIGINT) so it stops the server loop.
+    # setup signal handlers
+    # let Flask handle Ctrl+C (SIGINT)
     signal.signal(signal.SIGTERM, signal_handler)
 
     # create and start web interface

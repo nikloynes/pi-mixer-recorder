@@ -3,7 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -38,9 +38,18 @@ class DropboxSettings(BaseSettings):
     access_token: SecretStr
     app_key: SecretStr
     app_secret: SecretStr
-    upload_path: str = Field(default="pi_recordings")
+    refresh_token: SecretStr
+    upload_path: str = Field(default="/pi_recordings")
     delete_local_after_upload: bool = Field(default=False)
     upload_in_background: bool = Field(default=True)
+
+    @field_validator("upload_path", mode="after")
+    @classmethod
+    def ensure_posix_path(cls, v: str) -> str:
+        """Ensure posix path (trailing /) for upload location."""
+        if v[0] != "/":
+            v = "/" + v
+        return v
 
 
 class GPIOSettings(BaseSettings):

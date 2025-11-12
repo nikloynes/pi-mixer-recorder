@@ -1,3 +1,7 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0", "wheel"]
+
 [lint.isort]
 known-first-party = ["audio_recorder", "config_manager", "dropbox_uploader", "gpio_controller", "web_interface"]
 lint.mccabe.max-complexity = 18
@@ -63,6 +67,7 @@ lint.ignore = [
     "E501", # long lines, remove later on.
     "FIX002", # implicit trust that TODOs are not trivial, or else they would be fixed
     "ISC001", # simplify implicit str concatenation (ruff-format recommended)
+    "RUF010", # allows casting Path to str using str(path)
     "T201", # allows print - we use it in CLI component of app
     "TD002", # name for TO DO
     "TD003", # pedantic issue number requester in to docs
@@ -81,13 +86,13 @@ lint.per-file-ignores = {"tests*" = [
 ]}
 lint.select = ["ALL"]
 
+[tool.setuptools]
+package-dir = {"" = "."}
+packages = ["src"]
+
 [tool.tomlsort]
 all = true
 spaces_indent_inline_array = 4
 trailing_comma_inline_array = true
 overrides."project.classifiers".inline_arrays = false
 overrides."tool.coverage.paths.source".inline_arrays = false
-
-[tool.setuptools]
-package-dir = {"" = "."}
-packages = ["src"]
