@@ -42,5 +42,7 @@ The idea is that the Pi, once configured is always 'ready to go (record)'. We ca
 - `main.py`; a script which launches an `AudioRecorder` instance and the flask web app
 - `recording_uploading_poller.py`; a script which polls the recordings folder, and uploads completed recordings to Dropbox.
 
+You can install the units (and configure them by running `python src/utils/install_systemd_unit`. Run with the `--help` flag to get information about how to specify the script.)
+
 ### Reboot your Pi & start recording!
 Upon rebooting, your Pi will automatically launch the web app. You can start and end recordings here.
