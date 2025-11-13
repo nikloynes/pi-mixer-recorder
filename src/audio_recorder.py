@@ -103,10 +103,24 @@ class AudioRecorder:
             filepath: Path to save recording
 
         """
-        stream = None
         wf = None
+        stream = None
 
         try:
+            wf = wave.open(str(filepath), "wb")
+            wf.setnchannels(self.channels)
+            wf.setsampwidth(self.audio.get_sample_size(self.format))
+            wf.setframerate(self.sample_rate)
+
+            # --- Callback Function ---
+            # This function will be called by pyaudio in a separate thread
+            # whenever a new chunk of audio is available.
+            def callback(in_data, frame_count, time_info, status):
+                if wf:
+                    wf.writeframes(in_data)
+                # Tell the stream to continue calling the callback
+                return (in_data, pyaudio.paContinue)
+
             stream = self.audio.open(
                 format=self.format,
                 channels=self.channels,
@@ -114,48 +128,87 @@ class AudioRecorder:
                 input=True,
                 input_device_index=self.device_index,
                 frames_per_buffer=self.chunk_size,
+                stream_callback=callback,  # Use the callback
             )
 
-            wf = wave.open(str(filepath), "wb")  # noqa: SIM115
-            wf.setnchannels(self.channels)
-            wf.setsampwidth(self.audio.get_sample_size(self.format))
-            wf.setframerate(self.sample_rate)
+            logger.info("Recording started (using callback)")
+            stream.start_stream()
 
-            logger.info("Recording started")
-            frame_count = 0
+            # Wait for the stop event to be set from another thread
+            while not self.stop_event.is_set() and stream.is_active():
+                # Sleep briefly to avoid pegging the CPU
+                self.stop_event.wait(timeout=0.1)
 
-            while not self.stop_event.is_set():
-                try:
-                    data = stream.read(self.chunk_size, exception_on_overflow=False)
-                    wf.writeframes(
-                        data
-                    )  # don't cache to memory, write straight to disk
-                    frame_count += 1
-                except Exception as e:  # noqa: BLE001
-                    logger.error("Encountered error while recording.")
-                    logger.error(f"Error type: {type(e).__name__}")
-                    logger.error(f"Error message: {e}")
-                    logger.error("Stack trace:")
-                    logger.error(traceback.format_exc())
-                    break
+            logger.info("Recording stopped")
 
-            logger.info(f"Recording stopped, captured {frame_count} frames")
-
-        except Exception as e:  # noqa: BLE001
-            logger.error("Encountered error while recording.")
+        except Exception as e:
+            logger.error("An error occurred during recording setup or execution.")
             logger.error(f"Error type: {type(e).__name__}")
             logger.error(f"Error message: {e}")
-            logger.error("Stack trace:")
-            logger.error(traceback.format_exc())
-            return
+            logger.error("Stack trace:", traceback.format_exc())
         finally:
-            if stream:
+            if stream and stream.is_active():
                 stream.stop_stream()
+            if stream:
                 stream.close()
             if wf:
                 wf.close()
 
         logger.info(f"Recording saved to {filepath}")
+
+        # stream = None
+        # wf = None
+
+        # try:
+        #     stream = self.audio.open(
+        #         format=self.format,
+        #         channels=self.channels,
+        #         rate=self.sample_rate,
+        #         input=True,
+        #         input_device_index=self.device_index,
+        #         frames_per_buffer=self.chunk_size,
+        #     )
+
+        #     wf = wave.open(str(filepath), "wb")  # noqa: SIM115
+        #     wf.setnchannels(self.channels)
+        #     wf.setsampwidth(self.audio.get_sample_size(self.format))
+        #     wf.setframerate(self.sample_rate)
+
+        #     logger.info("Recording started")
+        #     frame_count = 0
+
+        #     while not self.stop_event.is_set():
+        #         try:
+        #             data = stream.read(self.chunk_size, exception_on_overflow=False)
+        #             wf.writeframes(
+        #                 data
+        #             )  # don't cache to memory, write straight to disk
+        #             frame_count += 1
+        #         except Exception as e:  # noqa: BLE001
+        #             logger.error("Encountered error while recording.")
+        #             logger.error(f"Error type: {type(e).__name__}")
+        #             logger.error(f"Error message: {e}")
+        #             logger.error("Stack trace:")
+        #             logger.error(traceback.format_exc())
+        #             break
+
+        #     logger.info(f"Recording stopped, captured {frame_count} frames")
+
+        # except Exception as e:  # noqa: BLE001
+        #     logger.error("Encountered error while recording.")
+        #     logger.error(f"Error type: {type(e).__name__}")
+        #     logger.error(f"Error message: {e}")
+        #     logger.error("Stack trace:")
+        #     logger.error(traceback.format_exc())
+        #     return
+        # finally:
+        #     if stream:
+        #         stream.stop_stream()
+        #         stream.close()
+        #     if wf:
+        #         wf.close()
+
+        # logger.info(f"Recording saved to {filepath}")
 
         # # upload to Dropbox if configured
         # if self.uploader and settings.dropbox.enabled:
