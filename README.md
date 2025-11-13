@@ -18,6 +18,11 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ### Install dependencies
+First you will need to install some system-level dependencies, which allow you to run `pyaudio` (a core dependency of this app). Note - this only applies on linux.
+```shell
+sudo apt-get install python3-dev portaudio19-dev
+```
+
 ```shell
 uv sync
 ```
