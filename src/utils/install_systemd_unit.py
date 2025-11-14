@@ -2,8 +2,8 @@
 Install a systemd unit to launch web app on Pi startup.
 
 To install:
-python src/utils/install_systemd_unit.py uploader --user pi --user_service
-python src/utils/install_systemd_unit.py webapp --user pi --user_service
+python src/utils/install_systemd_unit.py uploader --user pi --user-service
+python src/utils/install_systemd_unit.py webapp --user pi --user-service
 """
 
 import argparse
@@ -15,6 +15,7 @@ from pathlib import Path
 
 SERVICE_DEFAULT_NAME = "pi-mixer-recorder-daemon"
 UPLOADER_SERVICE_DEFAULT_NAME = "pi-mixer-recorder-uploader"
+PROJECT_PYTHON_PATH = Path(__file__).parent.parent / ".venv/bin/python"
 
 
 def detect_python() -> str:
@@ -113,7 +114,8 @@ def main() -> None:
 
     # Project root is two levels up from this script's directory (src/utils -> project_root)
     project_root = Path(__file__).resolve().parents[2]
-    python_exec = detect_python()
+    # python_exec = detect_python()
+    python_exec = PROJECT_PYTHON_PATH
     unit_text = ""
     start_cmd = ""
 
