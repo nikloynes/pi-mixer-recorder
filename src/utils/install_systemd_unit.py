@@ -144,7 +144,7 @@ def main() -> None:
     start_cmd = ""
 
     if args.service_type == "webapp":
-        start_cmd = "src/main.py"
+        start_cmd = "main.py"
         unit_text = render_unit(
             user=args.user,
             working_dir=project_root,
