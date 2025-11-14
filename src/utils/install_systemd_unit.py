@@ -1,61 +1,53 @@
 """
-Install a systemd unit to launch web app on Pi startup.
+Install a systemd USER unit to launch services on Pi startup.
 
 To install:
-python src/utils/install_systemd_unit.py uploader --user pi --user-service
-python src/utils/install_systemd_unit.py webapp --user pi --user-service
+python src/utils/install_systemd_unit.py webapp
+python src/utils/install_systemd_unit.py uploader
+
+To check status:
+systemctl --user status pi-mixer-recorder-daemon
+systemctl --user status pi-mixer-recorder-uploader
 """
 
 import argparse
-import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-SERVICE_DEFAULT_NAME = "pi-mixer-recorder-daemon"
-UPLOADER_SERVICE_DEFAULT_NAME = "pi-mixer-recorder-uploader"
-PROJECT_PYTHON_PATH = Path(__file__).parent.parent / ".venv/bin/python"
+# --- Configuration ---
+SERVICE_CONFIG = {
+    "webapp": {
+        "name": "pi-mixer-recorder-daemon",
+        "description": "Pi Mixer Recorder Web App",
+        "start_script": "main.py",
+    },
+    "uploader": {
+        "name": "pi-mixer-recorder-uploader",
+        "description": "Pi Mixer Recorder Dropbox Uploader",
+        "start_script": "src/utils/recording_uploading_poller.py",
+    },
+}
 
 
-def detect_python(project_root: Path) -> str:
-    """Return full python interpreter path, preferring a local venv."""
-    venv_python = project_root / ".venv" / "bin" / "python"
+def get_project_root() -> Path:
+    """Get the project's root directory."""
+    # This script is in src/utils, so root is two levels up.
+    return Path(__file__).resolve().parents[2]
+
+
+def get_python_executable(root: Path) -> str:
+    """Find the python executable, preferring the virtual environment."""
+    venv_python = root / ".venv" / "bin" / "python"
     if venv_python.exists():
-        print(f"Found Python executable in virtual environment: {venv_python}")
         return str(venv_python)
-
-    # fallback: sys python
-    system_python = shutil.which("python")
-    if system_python:
-        print(f"Found system Python executable: {system_python}")
-        return system_python
-
-    no_python = (
-        "Could not find a Python executable in .venv/bin/ or on the system PATH."
-    )
-    raise FileNotFoundError(no_python)
+    raise FileNotFoundError(f"Python not found in virtual environment: {venv_python}")
 
 
-def render_unit(  # noqa: PLR0913
-    user: str,
-    working_dir: Path,
-    python_exec: Path,
-    start_command: str,
-    description: str,
-    *,
-    is_user_service: bool,
+def generate_unit_file(
+    description: str, working_dir: str, python_exec: str, start_script: str
 ) -> str:
-    """Produce string for systemd unit to write to file."""
-    # User services should use default.target, system services use multi-user.target
-    install_target = "default.target" if is_user_service else "multi-user.target"
-
-    # User and Group directives are only needed for system-wide services
-    user_config = ""
-    if not is_user_service:
-        user_config = f"""User={user}
-Group={user}"""
-
+    """Generates the content for the .service file."""
     return f"""[Unit]
 Description={description}
 Wants=network-online.target
@@ -63,129 +55,81 @@ After=network-online.target
 
 [Service]
 Type=simple
-{user_config}
-WorkingDirectory={str(working_dir)}
+WorkingDirectory={working_dir}
 Environment=PYTHONUNBUFFERED=1
-ExecStart={str(python_exec)} {start_command}
+ExecStart={python_exec} {start_script}
 Restart=on-failure
 RestartSec=10
-TimeoutStopSec=20
 KillSignal=SIGTERM
 
 [Install]
-WantedBy={install_target}
-""".replace("\n\n\n", "\n\n")
+WantedBy=default.target
+"""
 
 
-def run(cmd: list[str], *, user_mode: bool = False) -> None:
-    """Run shell command."""
-    if user_mode:
-        cmd = ["systemctl", "--user", *cmd]
-    # Add sudo for system-wide commands if not running as root
-    elif os.geteuid() != 0:
-        cmd = ["sudo", "systemctl", *cmd]
-    else:
-        cmd = ["systemctl", *cmd]
-    subprocess.check_call(cmd)  # noqa: S603
+def run_command(cmd: list[str]) -> None:
+    """Runs a systemctl command for the current user."""
+    full_cmd = ["systemctl", "--user", *cmd]
+    print(f"Running: {' '.join(full_cmd)}")
+    subprocess.check_call(full_cmd)
 
 
 def main() -> None:
-    """Run processes sequentially."""
-    parser = argparse.ArgumentParser(
-        description="Install systemd service for pi-mixer-recorder"
+    """Main installation logic."""
+    parser = argparse.ArgumentParser(description="Install systemd user service.")
+    parser.add_argument(
+        "service_type",
+        choices=SERVICE_CONFIG.keys(),
+        help="The service to install.",
     )
-    subparsers = parser.add_subparsers(
-        dest="service_type", required=True, help="Type of service to install"
-    )
-
-    # --- Web App Service Parser ---
-    parser_app = subparsers.add_parser("webapp", help="Install the web app service")
-    parser_app.add_argument(
-        "--name", default=SERVICE_DEFAULT_NAME, help="Service name (without .service)"
-    )
-    parser_app.add_argument(
-        "--user",
-        default=os.environ.get("USER", "pi"),
-        help="User to run the service as",
-    )
-    parser_app.add_argument(
-        "--user-service",
-        action="store_true",
-        help="Install as a user service (no sudo).",
-    )
-
-    # --- Uploader Service Parser ---
-    parser_uploader = subparsers.add_parser(
-        "uploader", help="Install the Dropbox uploader service"
-    )
-    parser_uploader.add_argument(
-        "--name",
-        default=UPLOADER_SERVICE_DEFAULT_NAME,
-        help="Service name (without .service)",
-    )
-    parser_uploader.add_argument(
-        "--user",
-        default=os.environ.get("USER", "pi"),
-        help="User to run the service as",
-    )
-    parser_uploader.add_argument(
-        "--user-service",
-        action="store_true",
-        help="Install as a user service (no sudo).",
-    )
-
     args = parser.parse_args()
 
-    # Project root is two levels up from this script's directory (src/utils -> project_root)
-    project_root = Path(__file__).resolve().parents[2]
-    # python_exec = detect_python()
-    python_exec = detect_python(project_root)
-    unit_text = ""
-    start_cmd = ""
+    config = SERVICE_CONFIG[args.service_type]
+    service_name = f"{config['name']}.service"
 
-    if args.service_type == "webapp":
-        start_cmd = "main.py"
-        unit_text = render_unit(
-            user=args.user,
-            working_dir=project_root,
-            python_exec=Path(python_exec),
-            start_command=start_cmd,
-            description="Pi Mixer Recorder Web App",
-            is_user_service=args.user_service,
-        )
-    elif args.service_type == "uploader":
-        start_cmd = "src/utils/recording_uploading_poller.py"
-        unit_text = render_unit(
-            user=args.user,
-            working_dir=project_root,
-            python_exec=Path(python_exec),
-            start_command=start_cmd,
-            description="Pi Mixer Recorder Dropbox Uploader",
-            is_user_service=args.user_service,
+    try:
+        project_root = get_project_root()
+        python_exec = get_python_executable(project_root)
+
+        print(f"Project Root: {project_root}")
+        print(f"Python Executable: {python_exec}")
+
+        # Stop and disable the service first to ensure a clean state
+        try:
+            run_command(["stop", service_name])
+            run_command(["disable", service_name])
+        except subprocess.CalledProcessError:
+            print(f"Could not stop/disable {service_name}. It might not exist yet.")
+
+        # Generate and write the new service file
+        unit_content = generate_unit_file(
+            description=config["description"],
+            working_dir=str(project_root),
+            python_exec=python_exec,
+            start_script=config["start_script"],
         )
 
-    if args.user_service:
         dest_dir = Path.home() / ".config" / "systemd" / "user"
         dest_dir.mkdir(parents=True, exist_ok=True)
-        dest = dest_dir / f"{args.name}.service"
-        dest.write_text(unit_text)
-        print(f"Installed user service to {dest}")
-        run(["daemon-reload"], user_mode=True)
-        run(["enable", "--now", f"{args.name}.service"], user_mode=True)
-        print("To start on boot without login: sudo loginctl enable-linger $(whoami)")
-    else:
-        if os.geteuid() != 0:
-            print("Re-running with sudo for system-wide install.", file=sys.stderr)
-            # Re-execute the script with sudo
-            subprocess.check_call(["sudo", sys.executable, *sys.argv])  # noqa: S607 S603
-            sys.exit(0)
+        dest_path = dest_dir / service_name
+        dest_path.write_text(unit_content)
 
-        dest = Path("/etc/systemd/system") / f"{args.name}.service"
-        dest.write_text(unit_text)
-        print(f"Installed system service to {dest}")
-        run(["daemon-reload"])
-        run(["enable", "--now", f"{args.name}.service"])
-        print("Service enabled and started.")
+        print(f"\n--- Contents of {dest_path} ---")
+        print(unit_content)
+        print("-------------------------------------\n")
+
+        # Reload, enable, and start the service
+        run_command(["daemon-reload"])
+        run_command(["enable", service_name])
+        run_command(["start", service_name])
+
+        print(f"\nSuccessfully installed and started {service_name}.")
+        print("Run the following command to check its status:")
+        print(f"systemctl --user status {service_name}")
+
+    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+        print(f"\nAn error occurred: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
