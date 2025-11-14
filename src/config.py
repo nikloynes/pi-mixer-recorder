@@ -17,9 +17,9 @@ CONFIG_FILE_PATH = Path(__file__).parent.parent / "config.yaml"
 class AudioSettings(BaseSettings):
     """Audio configuration settings."""
 
-    sample_rate: int = Field(default=48000)
+    sample_rate: int = Field(default=44100)
     channels: int = Field(default=2)
-    chunk_size: int = Field(default=1024)
+    chunk_size: int = Field(default=4096)
     device_index: int | None = Field(default=None)
 
 

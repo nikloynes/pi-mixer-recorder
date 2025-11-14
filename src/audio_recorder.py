@@ -25,10 +25,9 @@ class AudioRecorder:
 
     def __init__(self, uploader: DropboxUploader | None = None) -> None:
         """
-        Initialize audio recorder.
+        Initialise audio recorder.
 
         Args:
-            config: ConfigManager instance
             uploader: DropboxUploader instance (optional)
 
         """

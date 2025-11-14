@@ -1,7 +1,7 @@
 audio:
   sample_rate: 44100  # 44100 or 48000
-  channels: 1
-  chunk_size: 1024
+  channels: 2
+  chunk_size: 4096
   # format: "paInt16"  # 16-bit audio
   device_index: null  # null = default device, or specify device index
 
@@ -16,8 +16,8 @@ dropbox:
   app_key: "bar"
   app_secret: "baz"
   refresh_token: "bazball"
-  upload_path: "/pi_recordings"  # Folder in Dropbox
-  delete_local_after_upload: false  # Keep local copies?
+  upload_path: "/pi_recordings"  # dropbox needs prefixed '/'
+  delete_local_after_upload: false  # keep local copies?
   upload_in_background: true  # Upload while recording or after?
 
 gpio: # NOT IMPLEMENTED
