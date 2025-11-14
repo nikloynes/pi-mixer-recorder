@@ -11,7 +11,8 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-CONFIG_FILE_PATH = Path(__file__).parent.parent / "config.yaml"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_FILE_PATH = PROJECT_ROOT / "config.yaml"
 
 
 class AudioSettings(BaseSettings):
@@ -68,6 +69,12 @@ class WebSettings(BaseSettings):
     debug: bool = Field(default=False)
 
 
+class LoggingSettings(BaseSettings):
+    """Logging config."""
+
+    log_file_path: Path = Field(default=PROJECT_ROOT / "app.log")
+
+
 class Settings(BaseSettings):
     """Combined settings model for the app."""
 
@@ -75,6 +82,7 @@ class Settings(BaseSettings):
     recording: RecordingSettings = Field(default_factory=RecordingSettings)
     dropbox: DropboxSettings = Field(default_factory=DropboxSettings)  # type: ignore[arg-type]
     gpio: GPIOSettings = Field(default_factory=GPIOSettings)
+    logging: LoggingSettings = LoggingSettings()
     web: WebSettings = Field(default_factory=WebSettings)
 
     model_config = SettingsConfigDict(
