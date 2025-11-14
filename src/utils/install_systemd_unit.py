@@ -48,6 +48,9 @@ def generate_unit_file(
     description: str, working_dir: str, python_exec: str, start_script: str
 ) -> str:
     """Generates the content for the .service file."""
+    # Create a unique log file name in /tmp based on the script name
+    log_file = f"/tmp/{Path(start_script).stem}.log"
+
     return f"""[Unit]
 Description={description}
 Wants=network-online.target
@@ -58,6 +61,8 @@ Type=simple
 WorkingDirectory={working_dir}
 Environment=PYTHONUNBUFFERED=1
 ExecStart={python_exec} {start_script}
+StandardOutput=file:{log_file}
+StandardError=file:{log_file}
 Restart=on-failure
 RestartSec=10
 KillSignal=SIGTERM
