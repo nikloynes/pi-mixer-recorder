@@ -1,5 +1,6 @@
 """Audio recording functionality."""
 
+import queue
 import traceback
 import wave
 from datetime import UTC, datetime
@@ -13,6 +14,10 @@ from src.config import get_settings
 from src.dropbox_uploader import DropboxUploader
 
 settings = get_settings()
+
+
+class DeviceIndexError(Exception):
+    """Raise when missing a device index in config/settings."""
 
 
 class AudioRecorder:
@@ -32,19 +37,47 @@ class AudioRecorder:
         self.recording_thread: Thread | None = None
         self.stop_event = Event()
 
-        # config
-        self.sample_rate: int = settings.audio.sample_rate
-        self.channels: int = settings.audio.channels
-        self.chunk_size: int = settings.audio.chunk_size
-        self.format = pyaudio.paInt16
-        self.device_index: int | None = settings.audio.device_index
-
-        self.output_path: Path = settings.recording.local_storage_path
-        self.filename_format: str = settings.recording.filename_format
-
         # init pyaudio
         self.audio = pyaudio.PyAudio()
         self._log_audio_devices()
+
+        # query device info for defaults
+        self.device_index: int | None = settings.audio.device_index
+
+        if self.device_index is None:
+            logger.error("No audio device index is specified in the config.")
+            idx_missing = (
+                "No device index found. Run `aplay -l` and "
+                " add your device's index to `config.yaml`."
+            )
+            raise DeviceIndexError(idx_missing)
+
+        try:
+            device_info = self.audio.get_device_info_by_index(
+                self.device_index if self.device_index is not None else -1
+            )
+            queried_sample_rate = int(
+                device_info.get("defaultSampleRate", settings.audio.sample_rate)
+            )
+            if queried_sample_rate != settings.audio.sample_rate:
+                logger.warning(
+                    f"Config sample rate is {settings.audio.sample_rate}, but device "
+                    f"default is {queried_sample_rate}. Using device default."
+                )
+            self.sample_rate: int = queried_sample_rate
+        except (OSError, TypeError):
+            logger.warning(
+                f"Could not query device {self.device_index}. Falling back to config sample rate."
+            )
+            self.sample_rate: int = settings.audio.sample_rate  # type: ignore[no-redef]
+
+        # config
+        self.channels: int = settings.audio.channels
+        self.chunk_size: int = settings.audio.chunk_size
+        self.format = pyaudio.paInt16
+
+        self.output_path: Path = settings.recording.local_storage_path
+        self.filename_format: str = settings.recording.filename_format
 
     def _log_audio_devices(self) -> None:
         """Log available audio devices for debugging."""
@@ -60,7 +93,7 @@ class AudioRecorder:
     def start_recording(self) -> bool:
         """Start recording audio."""
         if self.is_recording:
-            logger.warning("Already recording")
+            logger.warning("Already recording!")
             return False
 
         self.is_recording = True
@@ -103,23 +136,27 @@ class AudioRecorder:
             filepath: Path to save recording
 
         """
+        audio_queue: queue.Queue = queue.Queue()
         wf = None
         stream = None
 
         try:
-            wf = wave.open(str(filepath), "wb")
+            wf = wave.open(str(filepath), "wb")  # noqa: SIM115
             wf.setnchannels(self.channels)
             wf.setsampwidth(self.audio.get_sample_size(self.format))
             wf.setframerate(self.sample_rate)
 
-            # --- Callback Function ---
-            # This function will be called by pyaudio in a separate thread
-            # whenever a new chunk of audio is available.
-            def callback(in_data, frame_count, time_info, status):
-                if wf:
-                    wf.writeframes(in_data)
-                # Tell the stream to continue calling the callback
-                return (in_data, pyaudio.paContinue)
+            def callback(
+                in_data: bytes | None,
+                _frame_count: int,
+                _time_info: dict[str, float],
+                status: int,
+            ) -> tuple[bytes | None, int]:
+                if status:
+                    logger.warning(f"PyAudio callback status flag set: {status}")
+                if in_data:
+                    audio_queue.put(in_data)
+                return (None, pyaudio.paContinue)
 
             stream = self.audio.open(
                 format=self.format,
@@ -128,20 +165,26 @@ class AudioRecorder:
                 input=True,
                 input_device_index=self.device_index,
                 frames_per_buffer=self.chunk_size,
-                stream_callback=callback,  # Use the callback
+                stream_callback=callback,
             )
 
-            logger.info("Recording started (using callback)")
+            logger.info(
+                f"Recording started at {self.sample_rate} Hz (using queue pattern)"
+            )
             stream.start_stream()
 
-            # Wait for the stop event to be set from another thread
-            while not self.stop_event.is_set() and stream.is_active():
-                # Sleep briefly to avoid pegging the CPU
-                self.stop_event.wait(timeout=0.1)
+            while not self.stop_event.is_set() or not audio_queue.empty():
+                try:
+                    chunk = audio_queue.get(timeout=0.1)
+                    wf.writeframes(chunk)
+                except queue.Empty:
+                    if self.stop_event.is_set():
+                        break
+                    continue
 
             logger.info("Recording stopped")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error("An error occurred during recording setup or execution.")
             logger.error(f"Error type: {type(e).__name__}")
             logger.error(f"Error message: {e}")
@@ -153,6 +196,11 @@ class AudioRecorder:
                 stream.close()
             if wf:
                 wf.close()
+            while not audio_queue.empty():
+                try:
+                    audio_queue.get_nowait()
+                except queue.Empty:
+                    break
 
         logger.info(f"Recording saved to {filepath}")
 
@@ -169,7 +217,7 @@ class AudioRecorder:
         #         frames_per_buffer=self.chunk_size,
         #     )
 
-        #     wf = wave.open(str(filepath), "wb")  # noqa: SIM115
+        #     wf = wave.open(str(filepath), "wb")
         #     wf.setnchannels(self.channels)
         #     wf.setsampwidth(self.audio.get_sample_size(self.format))
         #     wf.setframerate(self.sample_rate)
@@ -184,7 +232,7 @@ class AudioRecorder:
         #                 data
         #             )  # don't cache to memory, write straight to disk
         #             frame_count += 1
-        #         except Exception as e:  # noqa: BLE001
+        #         except Exception as e:
         #             logger.error("Encountered error while recording.")
         #             logger.error(f"Error type: {type(e).__name__}")
         #             logger.error(f"Error message: {e}")
@@ -194,7 +242,7 @@ class AudioRecorder:
 
         #     logger.info(f"Recording stopped, captured {frame_count} frames")
 
-        # except Exception as e:  # noqa: BLE001
+        # except Exception as e:
         #     logger.error("Encountered error while recording.")
         #     logger.error(f"Error type: {type(e).__name__}")
         #     logger.error(f"Error message: {e}")
