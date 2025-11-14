@@ -37,14 +37,25 @@ def detect_python(project_root: Path) -> str:
     raise FileNotFoundError(no_python)
 
 
-def render_unit(
+def render_unit(  # noqa: PLR0913
     user: str,
     working_dir: Path,
     python_exec: Path,
     start_command: str,
     description: str,
+    *,
+    is_user_service: bool,
 ) -> str:
     """Produce string for systemd unit to write to file."""
+    # User services should use default.target, system services use multi-user.target
+    install_target = "default.target" if is_user_service else "multi-user.target"
+
+    # User and Group directives are only needed for system-wide services
+    user_config = ""
+    if not is_user_service:
+        user_config = f"""User={user}
+Group={user}"""
+
     return f"""[Unit]
 Description={description}
 Wants=network-online.target
@@ -52,8 +63,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-User={user}
-Group={user}
+{user_config}
 WorkingDirectory={str(working_dir)}
 Environment=PYTHONUNBUFFERED=1
 ExecStart={str(python_exec)} {start_command}
@@ -63,7 +73,7 @@ TimeoutStopSec=20
 KillSignal=SIGTERM
 
 [Install]
-WantedBy=multi-user.target
+WantedBy={install_target}
 """.replace("\n\n\n", "\n\n")
 
 
@@ -141,6 +151,7 @@ def main() -> None:
             python_exec=Path(python_exec),
             start_command=start_cmd,
             description="Pi Mixer Recorder Web App",
+            is_user_service=args.user_service,
         )
     elif args.service_type == "uploader":
         start_cmd = "src/utils/recording_uploading_poller.py"
@@ -150,6 +161,7 @@ def main() -> None:
             python_exec=Path(python_exec),
             start_command=start_cmd,
             description="Pi Mixer Recorder Dropbox Uploader",
+            is_user_service=args.user_service,
         )
 
     if args.user_service:
