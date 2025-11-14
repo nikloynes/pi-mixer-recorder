@@ -18,9 +18,23 @@ UPLOADER_SERVICE_DEFAULT_NAME = "pi-mixer-recorder-uploader"
 PROJECT_PYTHON_PATH = Path(__file__).parent.parent / ".venv/bin/python"
 
 
-def detect_python() -> str:
-    """Return full python interpreter path."""
-    return shutil.which("python")  # type: ignore[return-value]
+def detect_python(project_root: Path) -> str:
+    """Return full python interpreter path, preferring a local venv."""
+    venv_python = project_root / ".venv" / "bin" / "python"
+    if venv_python.exists():
+        print(f"Found Python executable in virtual environment: {venv_python}")
+        return str(venv_python)
+
+    # fallback: sys python
+    system_python = shutil.which("python")
+    if system_python:
+        print(f"Found system Python executable: {system_python}")
+        return system_python
+
+    no_python = (
+        "Could not find a Python executable in .venv/bin/ or on the system PATH."
+    )
+    raise FileNotFoundError(no_python)
 
 
 def render_unit(
@@ -115,7 +129,7 @@ def main() -> None:
     # Project root is two levels up from this script's directory (src/utils -> project_root)
     project_root = Path(__file__).resolve().parents[2]
     # python_exec = detect_python()
-    python_exec = PROJECT_PYTHON_PATH
+    python_exec = detect_python(project_root)
     unit_text = ""
     start_cmd = ""
 
