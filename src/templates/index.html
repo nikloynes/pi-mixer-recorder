@@ -70,6 +70,14 @@
             vertical-align: middle;
         }
 
+        .device-info {
+            text-align: center;
+            color: #888;
+            font-size: 0.9em;
+            margin-bottom: 30px;
+            min-height: 1.2em; /* Prevent layout shift */
+        }
+
         .controls {
             display: flex;
             gap: 15px;
@@ -188,9 +196,28 @@
         updateStatus();
         setInterval(updateStatus, 2000);
 
+        // Get device info on page load
+        getDeviceInfo();
+
         // Update recordings list
         updateRecordings();
         setInterval(updateRecordings, 5000);
+
+        async function getDeviceInfo() {
+            try {
+                const response = await fetch('/api/device');
+                const data = await response.json();
+                const deviceInfoEl = document.getElementById('deviceInfo');
+                if (data.success && data.device) {
+                    deviceInfoEl.textContent = `Using: ${data.device.name}`;
+                } else {
+                    deviceInfoEl.textContent = 'Could not determine audio device.';
+                }
+            } catch (error) {
+                console.error('Error fetching device info:', error);
+                document.getElementById('deviceInfo').textContent = 'Error fetching device info.';
+            }
+        }
 
         async function updateStatus() {
             try {

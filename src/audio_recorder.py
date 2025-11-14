@@ -42,6 +42,7 @@ class AudioRecorder:
 
         # query device info for defaults
         self.device_index: int | None = settings.audio.device_index
+        self.device_info: dict | None = None
 
         if self.device_index is None:
             logger.error("No audio device index is specified in the config.")
@@ -55,6 +56,7 @@ class AudioRecorder:
             device_info = self.audio.get_device_info_by_index(
                 self.device_index if self.device_index is not None else -1
             )
+            self.device_info = device_info
             queried_sample_rate = int(
                 device_info.get("defaultSampleRate", settings.audio.sample_rate)
             )

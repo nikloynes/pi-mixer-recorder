@@ -48,7 +48,7 @@ warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
 ignore_missing_imports = true
-module = ["RPi.GPIO", "dropbox.*", "loguru", "pyaudio"]
+module = ["RPi.GPIO", "dropbox.*", "flask.*", "loguru", "pyaudio"]
 
 [tool.ruff]
 extend-exclude = ["app/migrations/versions/*.py", "docs/*.py"]

@@ -30,7 +30,7 @@ def create_app(recorder: AudioRecorder) -> Flask:
     @app.route("/")
     def index() -> str:
         """Render main page."""
-        return render_template("index.html")
+        return render_template("index.html")  # type: ignore[no-any-return]
 
     @app.route("/api/status")
     def status() -> Response:
@@ -80,10 +80,26 @@ def create_app(recorder: AudioRecorder) -> Flask:
 
             files.sort(key=lambda x: x["created"], reverse=True)
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.exception("Error listing recordings")
             return jsonify({"recordings": [], "error": "Failed to list recordings"})
 
         return jsonify({"recordings": files})
+
+    @app.route("/api/device")
+    def device_info() -> Response:
+        """Get information about the current audio device."""
+        if recorder.device_info:
+            device_data = {
+                "index": recorder.device_info.get("index"),
+                "name": recorder.device_info.get("name"),
+                "max_input_channels": recorder.device_info.get("maxInputChannels"),
+                "default_sample_rate": recorder.device_info.get("defaultSampleRate"),
+            }
+            return jsonify({"success": True, "device": device_data})
+
+        return jsonify(
+            {"success": False, "error": "Audio device information not available."}
+        )
 
     return app
