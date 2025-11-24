@@ -5,11 +5,10 @@ import sys
 from pathlib import Path
 from threading import Event
 
-from loguru import logger
-
 from src.audio_recorder import AudioRecorder
 from src.config import get_settings
 from src.dropbox_uploader import DropboxUploader
+from src.logger import logger
 
 # from src.gpio_controller import GPIOController # noqa: ERA001
 from src.web_interface import create_app

@@ -7,10 +7,9 @@ and then deletes them locally.
 import time
 from pathlib import Path
 
-from loguru import logger
-
 from src.config import get_settings
 from src.dropbox_uploader import DropboxUploader
+from src.logger import logger
 
 # How long a file must be unmodified before we consider it "finished" (in seconds)
 FILE_STABILITY_THRESHOLD = 20
