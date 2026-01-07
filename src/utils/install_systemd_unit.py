@@ -47,7 +47,7 @@ def get_python_executable(root: Path) -> str:
 def generate_unit_file(
     description: str, working_dir: str, python_exec: str, start_script: str
 ) -> str:
-    """Generates the content for the .service file."""
+    """Generate the content for the .service file."""
     # Create a unique log file name in /tmp based on the script name
     log_file = f"/tmp/{Path(start_script).stem}.log"
 

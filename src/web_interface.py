@@ -30,7 +30,7 @@ def create_app(recorder: AudioRecorder) -> Flask:
     @app.route("/")
     def index() -> str:
         """Render main page."""
-        return render_template("index.html")  # type: ignore[no-any-return]
+        return render_template("index.html")
 
     @app.route("/api/status")
     def status() -> Response:
