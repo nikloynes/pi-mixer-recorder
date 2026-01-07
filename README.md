@@ -55,4 +55,4 @@ Upon rebooting, your Pi will automatically launch the web app. You can start and
 ### Troubleshooting
 | Issue  | Possible Solution |
 |-------|-----|
-| Pi doesn't maintain stable (Wifi) internet connection/Web app no longer reachable | This may have something to do with the Pi's WiFi 'Power Management'. Don't ask me why, or what specifically it does, but by default, it's set to `On`. I've found it helpful to set it to off, permanently. You can achieve this by sticking `iw dev wlan0 set power_save off` into a `systemd` service or `udev` (sudo likely required). |
+| Pi doesn't maintain stable (Wifi) internet connection/Web app no longer reachable | This may have something to do with the Pi's WiFi 'Power Management'. Don't ask me why, or what specifically it does, but by default, it's set to `On`. I've found it helpful to set it to off, permanently. You can achieve this by sticking `iw dev wlan0 set power_save off` into a `systemd` service or `udev` (sudo likely required). See [this blog post about maintaining consistent wifi on a Pi](https://www.dzombak.com/blog/2023/12/maintaining-a-solid-wifi-connection-on-raspberry-pi/). |
