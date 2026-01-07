@@ -1,6 +1,6 @@
 # pi-mixer-recorder
-A utility for recording audio coming from a mixer with a Raspberry Pi.
-
+A ready-to-go utility for recording audio coming from a USB audio interface with a Raspberry Pi. 
+ 
 ## tl, dr
 This repo was conceived of, suddenly, when 'dawless jamming' (look it up) into a mixer. While I own many a device to record the individual or summed instruments/signals going into the mixer, there was no easy way (without plugging in a computer or phone, starting a DAW, setting levels, etc.) to immediately record a jam in decent-ish quality. Enter `pi-mixer-recorder`, a headless bit of software that lets us...
 - begin (stereo) recordings from a class-compliant USB audio interface (e.g. from a mixer) into our Pi as wav
