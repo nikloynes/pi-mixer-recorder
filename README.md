@@ -49,10 +49,34 @@ The idea is that the Pi, once configured is always 'ready to go (record)'. We ca
 
 You can install the units (and configure them by running `python src/utils/install_systemd_unit`. Run with the `--help` flag to get information about how to specify the script.)
 
+**IMPORTANT: Enable user service persistence**  
+For user services to run on boot, you must enable _lingering_:
+```shell
+loginctl enable-linger $USER
+```
+This allows your user services to start at boot and continue running even when you're not logged in.
+
+After installing the services, verify they're enabled:
+```shell
+systemctl --user status pi-mixer-recorder-daemon
+systemctl --user status pi-mixer-recorder-uploader
+```
+
+Check logs if services aren't starting:
+```shell
+# Check service logs
+journalctl --user -u pi-mixer-recorder-daemon -f
+# Or check the application logs directly
+tail -f /tmp/main.log
+tail -f /tmp/recording_uploading_poller.log
+```
+
 ### Reboot your Pi & start recording!
 Upon rebooting, your Pi will automatically launch the web app. You can start and end recordings here.
 
 ### Troubleshooting
 | Issue  | Possible Solution |
 |-------|-----|
+| Web app doesn't start on boot/only works when SSH'd in | Run `loginctl enable-linger $USER` to allow user services to run without an active login session. Then reinstall the systemd units. |
 | Pi doesn't maintain stable (Wifi) internet connection/Web app no longer reachable | This may have something to do with the Pi's WiFi 'Power Management'. Don't ask me why, or what specifically it does, but by default, it's set to `On`. I've found it helpful to set it to off, permanently. You can achieve this by sticking `iw dev wlan0 set power_save off` into a `systemd` service or `udev` (sudo likely required). See [this blog post about maintaining consistent wifi on a Pi](https://www.dzombak.com/blog/2023/12/maintaining-a-solid-wifi-connection-on-raspberry-pi/). |
+| Can't access web app | Check logs with `tail -f /tmp/main.log` to see detailed startup diagnostics including network status and Flask initialization. Also verify the service is running: `systemctl --user status pi-mixer-recorder-daemon` |

@@ -53,19 +53,32 @@ def generate_unit_file(
 
     return f"""[Unit]
 Description={description}
+# Wait for network to be fully online
 Wants=network-online.target
 After=network-online.target
+# Add a small delay to ensure network stack is fully initialized
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 WorkingDirectory={working_dir}
+# Ensure Python output isn't buffered so logs appear immediately
 Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+# Add timestamp prefix to all log output
+ExecStartPre=/bin/sh -c 'echo "=== Service starting at $(date) ===" >> {log_file}'
 ExecStart={python_exec} {start_script}
-StandardOutput=file:{log_file}
-StandardError=file:{log_file}
+# Separate output and error logs for easier debugging
+StandardOutput=append:{log_file}
+StandardError=append:{log_file}
+# Restart on failure with exponential backoff
 Restart=on-failure
 RestartSec=10
 KillSignal=SIGTERM
+# Give service time to shut down gracefully
+TimeoutStopSec=30
+# Log service state changes
+ExecStopPost=/bin/sh -c 'echo "=== Service stopped at $(date) with status ${{SERVICE_RESULT}} ===" >> {log_file}'
 
 [Install]
 WantedBy=default.target
