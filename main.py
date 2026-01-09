@@ -166,6 +166,7 @@ def main() -> None:
             debug=settings.web.debug,
             use_reloader=False,  # important: avoid starting GPIO twice
         )
+        logger.info(f"Flask app running...")
     except KeyboardInterrupt:
         logger.warning("Keyboard interrupt received")
         return
