@@ -10,8 +10,8 @@ from threading import Event, Thread
 import pyaudio
 from loguru import logger
 
-from src.config import get_settings
-from src.dropbox_uploader import DropboxUploader
+from pi_rec.config import get_settings
+from pi_rec.dropbox_uploader import DropboxUploader
 
 settings = get_settings()
 

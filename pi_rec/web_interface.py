@@ -7,8 +7,8 @@ from flask import Flask, jsonify, render_template
 from flask.wrappers import Response
 from loguru import logger
 
-from src.audio_recorder import AudioRecorder
-from src.config import get_settings
+from pi_rec.audio_recorder import AudioRecorder
+from pi_rec.config import get_settings
 
 settings = get_settings()
 
@@ -30,7 +30,7 @@ def create_app(recorder: AudioRecorder) -> Flask:
     @app.route("/")
     def index() -> str:
         """Render main page."""
-        return render_template("index.html")
+        return render_template("index.html")  # type:ignore[no-any-return]
 
     @app.route("/api/status")
     def status() -> Response:

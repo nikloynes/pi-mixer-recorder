@@ -80,7 +80,7 @@ class Settings(BaseSettings):
 
     audio: AudioSettings = Field(default_factory=AudioSettings)
     recording: RecordingSettings = Field(default_factory=RecordingSettings)
-    dropbox: DropboxSettings = Field(default_factory=DropboxSettings)  # type: ignore[arg-type]
+    dropbox: DropboxSettings = Field(default_factory=DropboxSettings)  # type:ignore[arg-type]
     gpio: GPIOSettings = Field(default_factory=GPIOSettings)
     logging: LoggingSettings = LoggingSettings()
     web: WebSettings = Field(default_factory=WebSettings)

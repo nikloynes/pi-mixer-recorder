@@ -13,9 +13,10 @@ systemctl --user status pi-mixer-recorder-uploader
 import argparse
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
-# --- Configuration ---
+# config
 SERVICE_CONFIG = {
     "webapp": {
         "name": "pi-mixer-recorder-daemon",
@@ -41,7 +42,8 @@ def get_python_executable(root: Path) -> str:
     venv_python = root / ".venv" / "bin" / "python"
     if venv_python.exists():
         return str(venv_python)
-    raise FileNotFoundError(f"Python not found in virtual environment: {venv_python}")
+    no_python = f"Python not found in virtual environment: {venv_python}"
+    raise FileNotFoundError(no_python)
 
 
 def generate_unit_file(
@@ -49,7 +51,8 @@ def generate_unit_file(
 ) -> str:
     """Generate the content for the .service file."""
     # Create a unique log file name in /tmp based on the script name
-    log_file = f"/tmp/{Path(start_script).stem}.log"
+    temp_dir = tempfile.gettempdir()
+    log_file = f"{temp_dir}/{Path(start_script).stem}.log"
 
     return f"""[Unit]
 Description={description}
@@ -86,14 +89,14 @@ WantedBy=default.target
 
 
 def run_command(cmd: list[str]) -> None:
-    """Runs a systemctl command for the current user."""
+    """Run a systemctl command for the current user."""
     full_cmd = ["systemctl", "--user", *cmd]
     print(f"Running: {' '.join(full_cmd)}")
-    subprocess.check_call(full_cmd)
+    subprocess.check_call(full_cmd)  # noqa: S603
 
 
 def main() -> None:
-    """Main installation logic."""
+    """Run main installation logic."""
     parser = argparse.ArgumentParser(description="Install systemd user service.")
     parser.add_argument(
         "service_type",

@@ -7,7 +7,7 @@ from dropbox.exceptions import ApiError, AuthError
 from dropbox.files import FileMetadata, ListFolderResult
 from loguru import logger
 
-from src.config import get_settings
+from pi_rec.config import get_settings
 
 settings = get_settings()
 
