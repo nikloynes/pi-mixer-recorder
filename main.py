@@ -9,13 +9,11 @@ import time
 from pathlib import Path
 from threading import Event
 
-from src.audio_recorder import AudioRecorder
-from src.config import get_settings
-from src.dropbox_uploader import DropboxUploader
-from src.logger import logger
-
-# from src.gpio_controller import GPIOController # noqa: ERA001
-from src.web_interface import create_app
+from pi_rec.audio_recorder import AudioRecorder
+from pi_rec.config import get_settings
+from pi_rec.dropbox_uploader import DropboxUploader
+from pi_rec.logger import logger
+from pi_rec.web_interface import create_app
 
 settings = get_settings()
 uploader = DropboxUploader()
@@ -26,7 +24,8 @@ shutdown_event = Event()
 
 
 def check_network_connectivity(max_retries: int = 30, retry_delay: int = 2) -> bool:
-    """Check if network is available by attempting to resolve a hostname.
+    """
+    Check if network is available by attempting to resolve a hostname.
 
     Args:
         max_retries: Maximum number of connection attempts
@@ -34,6 +33,7 @@ def check_network_connectivity(max_retries: int = 30, retry_delay: int = 2) -> b
 
     Returns:
         True if network is available, False otherwise
+
     """
     logger.info("Checking network connectivity...")
 
@@ -41,8 +41,6 @@ def check_network_connectivity(max_retries: int = 30, retry_delay: int = 2) -> b
         try:
             # Try to resolve a reliable hostname
             socket.gethostbyname("www.google.com")
-            logger.debug(f"Network is available (attempt {attempt}/{max_retries})")
-            return True
         except socket.gaierror:
             if attempt < max_retries:
                 logger.warning(
@@ -56,6 +54,10 @@ def check_network_connectivity(max_retries: int = 30, retry_delay: int = 2) -> b
                     "Proceeding anyway, but external services may not work."
                 )
                 return False
+        else:
+            logger.debug(f"Network is available (attempt {attempt}/{max_retries})")
+            return True
+
     return False
 
 
@@ -74,8 +76,8 @@ def log_system_info() -> None:
         hostname = socket.gethostname()
         logger.info(f"Hostname: {hostname}")
 
-        result = subprocess.run(
-            ["hostname", "-I"],
+        result = subprocess.run(  # noqa: S603
+            ["hostname", "-I"],  # noqa: S607
             capture_output=True,
             text=True,
             check=False,
@@ -166,11 +168,11 @@ def main() -> None:
             debug=settings.web.debug,
             use_reloader=False,  # important: avoid starting GPIO twice
         )
-        logger.info(f"Flask app running...")
+        logger.info("Flask app running...")
     except KeyboardInterrupt:
         logger.warning("Keyboard interrupt received")
         return
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.error(f"Failed to start Flask app: {e}")
         logger.exception("Full traceback:")
         raise
