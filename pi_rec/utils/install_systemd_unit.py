@@ -2,8 +2,8 @@
 Install a systemd USER unit to launch services on Pi startup.
 
 To install:
-python src/utils/install_systemd_unit.py webapp
-python src/utils/install_systemd_unit.py uploader
+python pi_rec/utils/install_systemd_unit.py webapp
+python pi_rec/utils/install_systemd_unit.py uploader
 
 To check status:
 systemctl --user status pi-mixer-recorder-daemon
@@ -26,14 +26,14 @@ SERVICE_CONFIG = {
     "uploader": {
         "name": "pi-mixer-recorder-uploader",
         "description": "Pi Mixer Recorder Dropbox Uploader",
-        "start_script": "src/utils/recording_uploading_poller.py",
+        "start_script": "pi_rec/utils/recording_uploading_poller.py",
     },
 }
 
 
 def get_project_root() -> Path:
     """Get the project's root directory."""
-    # This script is in src/utils, so root is two levels up.
+    # root is two levels up.
     return Path(__file__).resolve().parents[2]
 
 
@@ -92,7 +92,7 @@ def run_command(cmd: list[str]) -> None:
     """Run a systemctl command for the current user."""
     full_cmd = ["systemctl", "--user", *cmd]
     print(f"Running: {' '.join(full_cmd)}")
-    subprocess.check_call(full_cmd)  # noqa: S603
+    subprocess.check_call(full_cmd)
 
 
 def main() -> None:

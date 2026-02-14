@@ -91,7 +91,7 @@ lint.select = ["ALL"]
 
 [tool.setuptools]
 package-dir = {"" = "."}
-packages = ["src"]
+packages = ["pi_rec"]
 
 [tool.tomlsort]
 all = true
