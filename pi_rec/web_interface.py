@@ -35,10 +35,13 @@ def create_app(recorder: AudioRecorder) -> Flask:
     @app.route("/api/status")
     def status() -> Response:
         """Get current recording status."""
+        stats = recorder.get_recording_stats() if recorder.is_recording else {}
+
         return jsonify(
             {
                 "is_recording": recorder.is_recording,
                 "timestamp": datetime.now(tz=UTC).isoformat(),
+                "stats": stats,
             }
         )
 
@@ -101,5 +104,44 @@ def create_app(recorder: AudioRecorder) -> Flask:
         return jsonify(
             {"success": False, "error": "Audio device information not available."}
         )
+
+    @app.route("/api/recording-info")
+    def recording_info() -> Response:
+        """Get detailed information about current recording."""
+        if not recorder.is_recording:
+            return jsonify({"success": False, "message": "Not currently recording"})
+
+        stats = recorder.get_recording_stats()
+        return jsonify({"success": True, "recording": stats})
+
+    @app.route("/api/health")
+    def health() -> Response:
+        """Get system health information."""
+        health_data = {
+            "device_connected": recorder.check_usb_device_health(),
+            "device_info": {
+                "index": recorder.device_index,
+                "name": recorder.device_name,
+                "sample_rate": recorder.sample_rate,
+                "channels": recorder.channels,
+                "chunk_size": recorder.chunk_size,
+                "chunk_duration_ms": round(
+                    recorder.chunk_size / recorder.sample_rate * 1000, 2
+                ),
+            },
+            "is_recording": recorder.is_recording,
+        }
+
+        if recorder.device_info:
+            health_data["device_latency"] = {
+                "low_input_ms": round(
+                    recorder.device_info.get("defaultLowInputLatency", 0) * 1000, 2
+                ),
+                "high_input_ms": round(
+                    recorder.device_info.get("defaultHighInputLatency", 0) * 1000, 2
+                ),
+            }
+
+        return jsonify(health_data)
 
     return app

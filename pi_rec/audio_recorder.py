@@ -5,9 +5,10 @@ import subprocess
 import time
 import traceback
 import wave
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 
 import pyaudio
 from loguru import logger
@@ -16,6 +17,53 @@ from pi_rec.config import get_settings
 from pi_rec.dropbox_uploader import DropboxUploader
 
 settings = get_settings()
+
+# Monitoring constants
+STATS_LOG_INTERVAL_SECONDS = 10
+HEALTH_CHECK_INTERVAL_SECONDS = 30
+CALLBACK_TIMEOUT_SECONDS = 5
+QUEUE_SIZE_WARNING_THRESHOLD = 100
+
+
+@dataclass
+class RecordingStats:
+    """Statistics for the current recording session."""
+
+    start_time: float = 0.0
+    frames_recorded: int = 0
+    bytes_written: int = 0
+    callback_count: int = 0
+    overflow_count: int = 0
+    underflow_count: int = 0
+    queue_max_size: int = 0
+    last_callback_time: float = 0.0
+    errors: list[str] = field(default_factory=list)
+    current_file: Path | None = None
+
+    def get_duration_seconds(self) -> float:
+        """Get recording duration in seconds."""
+        if self.start_time == 0:
+            return 0.0
+        return time.time() - self.start_time
+
+    def get_recording_info(self) -> dict:
+        """Get recording information as dict."""
+        return {
+            "duration_seconds": self.get_duration_seconds(),
+            "frames_recorded": self.frames_recorded,
+            "bytes_written": self.bytes_written,
+            "callback_count": self.callback_count,
+            "overflow_count": self.overflow_count,
+            "underflow_count": self.underflow_count,
+            "queue_max_size": self.queue_max_size,
+            "current_file": str(self.current_file) if self.current_file else None,
+            "file_size_mb": (
+                round(self.current_file.stat().st_size / (1024 * 1024), 2)
+                if self.current_file and self.current_file.exists()
+                else 0
+            ),
+            "errors": self.errors[-5:],  # Last 5 errors
+        }
 
 
 class DeviceIndexError(Exception):
@@ -36,7 +84,10 @@ class AudioRecorder:
         self.uploader = uploader
         self.is_recording = False
         self.recording_thread: Thread | None = None
+        self.monitoring_thread: Thread | None = None
         self.stop_event = Event()
+        self.stats = RecordingStats()
+        self.stats_lock = Lock()
 
         # init pyaudio
         self.audio = pyaudio.PyAudio()
@@ -96,7 +147,10 @@ class AudioRecorder:
             logger.info(
                 f"  [{i}] {info['name']} - "
                 f"Inputs: {info['maxInputChannels']}, "
-                f"Outputs: {info['maxOutputChannels']}"
+                f"Outputs: {info['maxOutputChannels']}, "
+                f"Sample Rate: {info.get('defaultSampleRate', 'Unknown')}, "
+                f"Low Latency: {info.get('defaultLowInputLatency', 0) * 1000:.1f}ms, "
+                f"High Latency: {info.get('defaultHighInputLatency', 0) * 1000:.1f}ms"
             )
 
     def _rescan_usb_devices(self) -> None:
@@ -171,6 +225,129 @@ class AudioRecorder:
         )
         return False
 
+    def get_recording_stats(self) -> dict:
+        """
+        Get current recording statistics.
+
+        Returns:
+            Dictionary with recording stats
+
+        """
+        with self.stats_lock:
+            return self.stats.get_recording_info()
+
+    def check_usb_device_health(self) -> bool:
+        """
+        Check if USB audio device is still connected and healthy.
+
+        Returns:
+            True if device is healthy, False otherwise
+
+        """
+        try:
+            # Check if we can still query the device
+            device_info = self.audio.get_device_info_by_index(self.device_index)
+
+            # Verify device name matches if configured
+            if self.device_name and device_info.get("name") != self.device_name:
+                logger.error(
+                    f"USB device name mismatch! Expected '{self.device_name}', "
+                    f"got '{device_info.get('name')}'"
+                )
+                return False
+
+            # Check USB device still exists in system
+            proc_cards = Path("/proc/asound/cards")
+            if proc_cards.exists():
+                cards_info = proc_cards.read_text()
+                if self.device_name and self.device_name not in cards_info:
+                    logger.error(
+                        f"USB device '{self.device_name}' not found in /proc/asound/cards"
+                    )
+                    return False
+
+        except OSError as e:
+            logger.error(f"USB device health check failed: {e}")
+            return False
+        else:
+            return True
+
+    def _monitor_recording(self, audio_queue: queue.Queue) -> None:
+        """
+        Monitor recording health in a separate thread.
+
+        Args:
+            audio_queue: The audio data queue to monitor
+
+        """
+        logger.info("Recording monitoring thread started")
+        last_stats_log = time.time()
+        last_health_check = time.time()
+
+        while not self.stop_event.is_set():
+            time.sleep(1)  # Check every second
+
+            current_time = time.time()
+
+            # Log stats periodically
+            if current_time - last_stats_log >= STATS_LOG_INTERVAL_SECONDS:
+                with self.stats_lock:
+                    duration = self.stats.get_duration_seconds()
+                    queue_size = audio_queue.qsize()
+
+                    logger.info(
+                        f"Recording stats: "
+                        f"Duration: {duration:.1f}s, "
+                        f"Frames: {self.stats.frames_recorded:,}, "
+                        f"Bytes: {self.stats.bytes_written:,} ({self.stats.bytes_written / (1024 * 1024):.2f} MB), "
+                        f"Callbacks: {self.stats.callback_count:,}, "
+                        f"Queue: {queue_size}, "
+                        f"Max Queue: {self.stats.queue_max_size}, "
+                        f"Overflows: {self.stats.overflow_count}, "
+                        f"Underflows: {self.stats.underflow_count}"
+                    )
+
+                    # Check for issues
+                    if self.stats.overflow_count > 0:
+                        logger.warning(
+                            f"Detected {self.stats.overflow_count} buffer overflows! "
+                            "Consider increasing chunk_size or reducing CPU load."
+                        )
+
+                    if queue_size > QUEUE_SIZE_WARNING_THRESHOLD:
+                        logger.warning(
+                            f"Audio queue is large ({queue_size} items). "
+                            "Disk write may be falling behind."
+                        )
+
+                    # Check if callbacks have stopped
+                    if (
+                        current_time - self.stats.last_callback_time
+                        > CALLBACK_TIMEOUT_SECONDS
+                    ):
+                        logger.error(
+                            f"No audio callbacks received for {CALLBACK_TIMEOUT_SECONDS} seconds! "
+                            "Recording may have stopped."
+                        )
+                        with self.stats_lock:
+                            self.stats.errors.append(
+                                f"No callbacks for {CALLBACK_TIMEOUT_SECONDS}s at {datetime.now(tz=UTC).isoformat()}"
+                            )
+
+                last_stats_log = current_time
+
+            # Health check periodically
+            if current_time - last_health_check >= HEALTH_CHECK_INTERVAL_SECONDS:
+                if not self.check_usb_device_health():
+                    logger.error("USB device health check failed during recording!")
+                    with self.stats_lock:
+                        self.stats.errors.append(
+                            f"USB health check failed at {datetime.now(tz=UTC).isoformat()}"
+                        )
+                last_health_check = current_time
+
+        logger.info("Recording monitoring thread stopped")
+
     def start_recording(self) -> bool:
         """Start recording audio."""
         if self.is_recording:
@@ -180,11 +357,23 @@ class AudioRecorder:
         self.is_recording = True
         self.stop_event.clear()
 
+        # Reset stats
+        with self.stats_lock:
+            self.stats = RecordingStats()
+            self.stats.start_time = time.time()
+
         timestamp = datetime.now(tz=UTC).strftime(self.filename_format)
         filename = f"{timestamp}.wav"
         filepath = Path(self.output_path) / filename
 
+        with self.stats_lock:
+            self.stats.current_file = filepath
+
         logger.info(f"Starting recording to {filepath}...")
+        logger.info(
+            f"Audio config: {self.sample_rate}Hz, {self.channels}ch, "
+            f"chunk_size={self.chunk_size} (~{self.chunk_size / self.sample_rate * 1000:.1f}ms)"
+        )
 
         # open thread
         self.recording_thread = Thread(
@@ -206,10 +395,24 @@ class AudioRecorder:
         if self.recording_thread:
             self.recording_thread.join(timeout=5)
 
+        if self.monitoring_thread:
+            self.monitoring_thread.join(timeout=5)
+
+        # Log final stats
+        with self.stats_lock:
+            logger.info(
+                f"Recording completed: "
+                f"Duration: {self.stats.get_duration_seconds():.1f}s, "
+                f"Total bytes: {self.stats.bytes_written:,} ({self.stats.bytes_written / (1024 * 1024):.2f} MB), "
+                f"Total callbacks: {self.stats.callback_count:,}, "
+                f"Overflows: {self.stats.overflow_count}, "
+                f"Errors: {len(self.stats.errors)}"
+            )
+
         self.is_recording = False
         return True
 
-    def _record_audio(self, filepath: str) -> None:
+    def _record_audio(self, filepath: str) -> None:  # noqa: PLR0915 (for now)
         """
         Private method to record audio to file.
 
@@ -233,10 +436,44 @@ class AudioRecorder:
                 _time_info: dict[str, float],
                 status: int,
             ) -> tuple[bytes | None, int]:
+                with self.stats_lock:
+                    self.stats.callback_count += 1
+                    self.stats.last_callback_time = time.time()
+
                 if status:
-                    logger.warning(f"PyAudio callback status flag set: {status}")
+                    # Decode PyAudio status flags
+                    status_msg = []
+                    if status & pyaudio.paInputOverflow:
+                        status_msg.append("INPUT_OVERFLOW")
+                        with self.stats_lock:
+                            self.stats.overflow_count += 1
+                    if status & pyaudio.paInputUnderflow:
+                        status_msg.append("INPUT_UNDERFLOW")
+                        with self.stats_lock:
+                            self.stats.underflow_count += 1
+                    if status & pyaudio.paOutputOverflow:
+                        status_msg.append("OUTPUT_OVERFLOW")
+                    if status & pyaudio.paOutputUnderflow:
+                        status_msg.append("OUTPUT_UNDERFLOW")
+
+                    logger.warning(
+                        f"PyAudio callback status: {' | '.join(status_msg)} (code: {status})"
+                    )
+                    with self.stats_lock:
+                        self.stats.errors.append(
+                            f"{' | '.join(status_msg)} at {datetime.now(tz=UTC).isoformat()}"
+                        )
+
                 if in_data:
                     audio_queue.put(in_data)
+                    with self.stats_lock:
+                        self.stats.frames_recorded += _frame_count
+                        # Track queue size
+                        queue_size = audio_queue.qsize()
+                        self.stats.queue_max_size = max(
+                            self.stats.queue_max_size, queue_size
+                        )
+
                 return (None, pyaudio.paContinue)
 
             stream = self.audio.open(
@@ -252,12 +489,25 @@ class AudioRecorder:
             logger.info(
                 f"Recording started at {self.sample_rate} Hz (using queue pattern)"
             )
+
+            # Log stream info
+            stream_info = stream.get_stream_info()
+            logger.info(f"Stream info: {stream_info}")
+
             stream.start_stream()
+
+            # Start monitoring thread
+            self.monitoring_thread = Thread(
+                target=self._monitor_recording, args=(audio_queue,), daemon=True
+            )
+            self.monitoring_thread.start()
 
             while not self.stop_event.is_set() or not audio_queue.empty():
                 try:
                     chunk = audio_queue.get(timeout=0.1)
                     wf.writeframes(chunk)
+                    with self.stats_lock:
+                        self.stats.bytes_written += len(chunk)
                 except queue.Empty:
                     if self.stop_event.is_set():
                         break
@@ -270,6 +520,10 @@ class AudioRecorder:
             logger.error(f"Error type: {type(e).__name__}")
             logger.error(f"Error message: {e}")
             logger.error("Stack trace:", traceback.format_exc())
+            with self.stats_lock:
+                self.stats.errors.append(
+                    f"Exception: {type(e).__name__}: {e} at {datetime.now(tz=UTC).isoformat()}"
+                )
         finally:
             if stream and stream.is_active():
                 stream.stop_stream()

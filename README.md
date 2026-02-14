@@ -7,6 +7,8 @@ This repo was conceived of, suddenly, when 'dawless jamming' (look it up) into a
 - poll the Pi's local download directory to automatically upload (and, if required, thereafter delete) recording files to Dropbox
 - deliver this functionality via a compact `Flask` web app.
 
+**NOTE:** some AI features (Claude Sonnet 4.5 in Github Copilot) were used to assist in the coding of this software, specifically for the HTML/JS elements and audio specifics. It is not an entirely vibe-coded app.
+
 ## Installation
 You have two options: use `uv`, or `pip`/`requirements.txt`.
 The recommended option is `uv`.

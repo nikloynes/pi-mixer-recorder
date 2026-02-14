@@ -82,6 +82,93 @@
             min-height: 1.2em; /* Prevent layout shift */
         }
 
+        .recording-stats {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none; /* Hidden by default */
+        }
+
+        .recording-stats.visible {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #333;
+            margin-top: 5px;
+        }
+
+        .health-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+
+        .health-indicator.healthy {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .health-indicator.warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .health-indicator.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .warnings {
+            margin-top: 15px;
+            padding: 10px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .warnings.visible {
+            display: block;
+        }
+
+        .warnings-title {
+            font-weight: 600;
+            color: #856404;
+            margin-bottom: 5px;
+        }
+
+        .warning-item {
+            font-size: 0.85em;
+            color: #856404;
+            margin: 3px 0;
+        }
+
         .controls {
             display: flex;
             gap: 15px;
@@ -182,6 +269,37 @@
             Loading device...
         </div>
 
+        <div class="recording-stats" id="recordingStats">
+            <h3 style="text-align: center; margin-bottom: 10px; color: #555;">Recording Statistics</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Duration</div>
+                    <div class="stat-value" id="statDuration">0:00</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">File Size</div>
+                    <div class="stat-value" id="statFileSize">0 MB</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Queue Size</div>
+                    <div class="stat-value" id="statQueue">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Overflows</div>
+                    <div class="stat-value" id="statOverflows">0</div>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <div class="health-indicator healthy" id="healthIndicator">
+                    ● Device Healthy
+                </div>
+            </div>
+            <div class="warnings" id="warnings">
+                <div class="warnings-title">⚠️ Warnings</div>
+                <div id="warningsList"></div>
+            </div>
+        </div>
+
         <div class="controls">
             <button class="btn-start" id="startBtn" onclick="startRecording()">
                 Start Recording
@@ -219,9 +337,19 @@
                 const data = await response.json();
                 const deviceInfoEl = document.getElementById('deviceInfo');
                 if (data.success && data.device) {
-                    deviceInfoEl.textContent = `Using: ${data.device.name}`;
+                    deviceInfoEl.textContent = `Using: ${data.device.name} @ ${data.device.default_sample_rate}Hz`;
                 } else {
                     deviceInfoEl.textContent = 'Could not determine audio device.';
+                }
+
+                // Also get health info for additional details
+                const healthResponse = await fetch('/api/health');
+                const healthData = await healthResponse.json();
+                if (healthData.device_info) {
+                    const info = healthData.device_info;
+                    const latencyInfo = healthData.device_latency ?
+                        ` (Latency: ${healthData.device_latency.low_input_ms}ms-${healthData.device_latency.high_input_ms}ms)` : '';
+                    deviceInfoEl.title = `Chunk: ${info.chunk_size} frames (~${info.chunk_duration_ms}ms)${latencyInfo}`;
                 }
             } catch (error) {
                 console.error('Error fetching device info:', error);
@@ -239,21 +367,93 @@
                 const statusText = document.getElementById('statusText');
                 const startBtn = document.getElementById('startBtn');
                 const stopBtn = document.getElementById('stopBtn');
+                const recordingStats = document.getElementById('recordingStats');
 
                 if (isRecording) {
                     statusIndicator.className = 'status-indicator recording';
                     statusText.textContent = 'Recording...';
                     startBtn.disabled = true;
                     stopBtn.disabled = false;
+                    recordingStats.className = 'recording-stats visible';
+
+                    // Update stats if available
+                    if (data.stats) {
+                        updateRecordingStats(data.stats);
+                    }
                 } else {
                     statusIndicator.className = 'status-indicator idle';
                     statusText.textContent = 'Ready';
                     startBtn.disabled = false;
                     stopBtn.disabled = true;
+                    recordingStats.className = 'recording-stats';
                 }
             } catch (error) {
                 console.error('Error updating status:', error);
                 document.getElementById('statusText').textContent = 'Offline';
+            }
+        }
+
+        function formatDuration(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateRecordingStats(stats) {
+            // Update duration
+            document.getElementById('statDuration').textContent =
+                formatDuration(stats.duration_seconds || 0);
+
+            // Update file size
+            document.getElementById('statFileSize').textContent =
+                `${stats.file_size_mb || 0} MB`;
+
+            // Update queue size
+            const queueSize = stats.queue_max_size || 0;
+            document.getElementById('statQueue').textContent = queueSize;
+
+            // Update overflows with warning color
+            const overflows = stats.overflow_count || 0;
+            const overflowEl = document.getElementById('statOverflows');
+            overflowEl.textContent = overflows;
+            if (overflows > 0) {
+                overflowEl.style.color = '#e74c3c';
+            } else {
+                overflowEl.style.color = '#333';
+            }
+
+            // Update warnings
+            const warningsEl = document.getElementById('warnings');
+            const warningsListEl = document.getElementById('warningsList');
+
+            if (stats.errors && stats.errors.length > 0) {
+                warningsEl.className = 'warnings visible';
+                warningsListEl.innerHTML = stats.errors
+                    .map(err => `<div class="warning-item">${err}</div>`)
+                    .join('');
+            } else {
+                warningsEl.className = 'warnings';
+            }
+
+            // Check health periodically
+            checkDeviceHealth();
+        }
+
+        async function checkDeviceHealth() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                const healthIndicator = document.getElementById('healthIndicator');
+
+                if (data.device_connected) {
+                    healthIndicator.className = 'health-indicator healthy';
+                    healthIndicator.textContent = '● Device Healthy';
+                } else {
+                    healthIndicator.className = 'health-indicator error';
+                    healthIndicator.textContent = '● Device Disconnected';
+                }
+            } catch (error) {
+                console.error('Error checking device health:', error);
             }
         }
 
