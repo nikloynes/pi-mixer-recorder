@@ -70,6 +70,7 @@ lint.ignore = [
     "FIX002", # implicit trust that TODOs are not trivial, or else they would be fixed
     "ISC001", # simplify implicit str concatenation (ruff-format recommended)
     "RUF010", # allows casting Path to str using str(path)
+    "S603", # subprocess untrusted input (we trust the input and hardcode it)
     "T201", # allows print - we use it in CLI component of app
     "TD002", # name for TO DO
     "TD003", # pedantic issue number requester in to docs

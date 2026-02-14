@@ -1,6 +1,8 @@
 """Audio recording functionality."""
 
 import queue
+import subprocess
+import time
 import traceback
 import wave
 from datetime import UTC, datetime
@@ -90,6 +92,22 @@ class AudioRecorder:
                 f"Inputs: {info['maxInputChannels']}, "
                 f"Outputs: {info['maxOutputChannels']}"
             )
+
+    def _rescan_usb_devices(self) -> None:
+        """Force Linux to re-scan USB devices."""
+        # Unbind and rebind USB devices
+        subprocess.run(
+            ["/usr/bin/sudo", "sh", "-c", "echo '1' > /sys/bus/usb/drivers/usb/unbind"],
+            check=False,
+            timeout=2,
+        )
+        time.sleep(1)
+        subprocess.run(
+            ["/usr/bin/sudo", "sh", "-c", "echo '1' > /sys/bus/usb/drivers/usb/bind"],
+            check=False,
+            timeout=2,
+        )
+        logger.info("USB devices rescanned")
 
     def start_recording(self) -> bool:
         """Start recording audio."""
