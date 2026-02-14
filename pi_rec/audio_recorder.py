@@ -55,6 +55,11 @@ class AudioRecorder:
             )
             raise DeviceIndexError(idx_missing)
 
+        ready = False
+        while not ready:
+            ready = self._wait_for_device()
+            logger.warning("unable to find the right usb device, rescanning.")
+            self._rescan_usb_devices()
         try:
             device_info = self.audio.get_device_info_by_index(
                 self.device_index if self.device_index is not None else -1
@@ -136,7 +141,10 @@ class AudioRecorder:
 
                 # check for device
                 device_info = self.audio.get_device_info_by_index(self.device_index)
-                if device_info.get("name") != self.device_name:
+                if (
+                    self.device_name is not None
+                    and device_info.get("name") != self.device_name
+                ):
                     logger.warning(
                         f"retrieved name for device with index {self.device_index}"
                         f"is {device_info.get('name')}. we want: {self.device_name}"
