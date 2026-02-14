@@ -22,6 +22,7 @@ class AudioSettings(BaseSettings):
     channels: int = Field(default=2)
     chunk_size: int = Field(default=4096)
     device_index: int | None = Field(default=None)
+    device_name: str | None = Field(default=None)
 
 
 class RecordingSettings(BaseSettings):

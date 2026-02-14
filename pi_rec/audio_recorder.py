@@ -44,6 +44,7 @@ class AudioRecorder:
 
         # query device info for defaults
         self.device_index: int | None = settings.audio.device_index
+        self.device_name: str | None = settings.audio.device_name
         self.device_info: dict | None = None
 
         if self.device_index is None:
@@ -95,7 +96,7 @@ class AudioRecorder:
 
     def _rescan_usb_devices(self) -> None:
         """Force Linux to re-scan USB devices."""
-        # Unbind and rebind USB devices
+        # unbind and rebind USB devices
         subprocess.run(
             ["/usr/bin/sudo", "sh", "-c", "echo '1' > /sys/bus/usb/drivers/usb/unbind"],
             check=False,
@@ -108,6 +109,59 @@ class AudioRecorder:
             timeout=2,
         )
         logger.info("USB devices rescanned")
+
+    def _wait_for_device(self, max_retries: int = 30, retry_delay: int = 2) -> bool:
+        """
+        Wait for the target audio device to become available.
+        This is achieved by re-initialising the list of audio
+        devices in PyAudio.
+
+        Args:
+            max_retries: Maximum number of attempts
+            retry_delay: Seconds between retries
+
+        Returns:
+            True if device found, False otherwise
+
+        """
+        logger.info(f"Waiting for audio device {self.device_index}...")
+
+        tries = 0
+        while tries < max_retries:
+            tries += 1
+            try:
+                # re-initialise
+                self.audio.terminate()
+                self.audio = pyaudio.PyAudio()
+
+                # check for device
+                device_info = self.audio.get_device_info_by_index(self.device_index)
+                if device_info.get("name") != self.device_name:
+                    logger.warning(
+                        f"retrieved name for device with index {self.device_index}"
+                        f"is {device_info.get('name')}. we want: {self.device_name}"
+                    )
+                    continue
+
+                # check n channels
+                if device_info.get("maxInputChannels", 0) > 0:
+                    logger.info(f"Device found:  {device_info['name']}")
+                    return True
+                logger.warning(f"Device {self.device_index} has no input channels")
+
+            except OSError as e:
+                logger.warning(
+                    f"Device {self.device_index} not ready "
+                    f"(attempt {tries}/{max_retries}): {e}. "
+                    f"Retrying in {retry_delay}s..."
+                )
+            finally:
+                time.sleep(retry_delay)
+
+        logger.error(
+            f"Device {self.device_index} not found after {max_retries} attempts"
+        )
+        return False
 
     def start_recording(self) -> bool:
         """Start recording audio."""
