@@ -109,8 +109,9 @@ class AudioRecorder:
         ready = False
         while not ready:
             ready = self._wait_for_device()
-            logger.warning("unable to find the right usb device, rescanning.")
-            self._rescan_usb_devices()
+            if not ready:
+                logger.warning("unable to find the right usb device, rescanning.")
+                self._rescan_usb_devices()
         try:
             device_info = self.audio.get_device_info_by_index(
                 self.device_index if self.device_index is not None else -1
@@ -257,14 +258,35 @@ class AudioRecorder:
                 return False
 
             # Check USB device still exists in system
+            # /proc/asound/cards uses different naming than PyAudio
             proc_cards = Path("/proc/asound/cards")
             if proc_cards.exists():
                 cards_info = proc_cards.read_text()
-                if self.device_name and self.device_name not in cards_info:
-                    logger.error(
-                        f"USB device '{self.device_name}' not found in /proc/asound/cards"
-                    )
-                    return False
+
+                # Extract the core device name from PyAudio's format
+                # PyAudio: "Soundcraft 2-channel Audio Driv: USB Audio (hw:1,0)"
+                # proc: "Soundcraft 2-channel Audio Driv"
+                if self.device_name:
+                    # Extract name before the colon (if present)
+                    core_name = self.device_name.split(":")[0].strip()
+
+                    # Also handle the card index from (hw:X,Y) format
+                    if "(hw:" in self.device_name:
+                        hw_index = self.device_name.split("(hw:")[1].split(",")[0]
+                        # Check if card index exists
+                        if f" {hw_index} [" not in cards_info:
+                            logger.error(
+                                f"USB device card index {hw_index} not found in /proc/asound/cards"
+                            )
+                            return False
+
+                    # Check if core device name exists in proc
+                    if core_name not in cards_info:
+                        logger.error(
+                            f"USB device '{core_name}' not found in /proc/asound/cards. "
+                            f"Available: {cards_info}"
+                        )
+                        return False
 
         except OSError as e:
             logger.error(f"USB device health check failed: {e}")
@@ -412,6 +434,67 @@ class AudioRecorder:
         self.is_recording = False
         return True
 
+    def _log_stream_info(self, stream: pyaudio.Stream) -> None:
+        """
+        Log comprehensive information about the PyAudio stream.
+
+        Args:
+            stream: The PyAudio Stream object
+
+        """
+        try:
+            # Stream configuration
+            logger.info("=" * 60)
+            logger.info("STREAM CONFIGURATION")
+            logger.info("=" * 60)
+            logger.info(f"Sample Rate: {self.sample_rate} Hz")
+            logger.info(f"Channels: {self.channels}")
+            logger.info(f"Format: {self.format}")
+            logger.info(f"Frames per buffer: {self.chunk_size}")
+            logger.info(
+                f"Buffer duration: ~{(self.chunk_size / self.sample_rate) * 1000:.1f}ms"
+            )
+
+            # Stream latency information
+            logger.info("-" * 60)
+            logger.info("STREAM LATENCY")
+            logger.info("-" * 60)
+            input_latency = stream.get_input_latency()
+            output_latency = stream.get_output_latency()
+            logger.info(f"Input latency: {input_latency * 1000:.2f}ms")
+            logger.info(f"Output latency: {output_latency * 1000:.2f}ms")
+
+            # Stream state
+            logger.info("-" * 60)
+            logger.info("STREAM STATE")
+            logger.info("-" * 60)
+            logger.info(f"Is active: {stream.is_active()}")
+            logger.info(f"Is stopped: {stream.is_stopped()}")
+            logger.info(f"Stream time: {stream.get_time():.3f}s")
+            logger.info(f"CPU load: {stream.get_cpu_load() * 100:.2f}%")
+
+            # Buffer availability (for blocking mode)
+            if hasattr(stream, "get_read_available"):
+                try:
+                    read_available = stream.get_read_available()
+                    logger.info(f"Read available frames: {read_available}")
+                except OSError:
+                    # Not available in callback mode
+                    logger.debug("Read available: N/A (callback mode)")
+
+            if hasattr(stream, "get_write_available"):
+                try:
+                    write_available = stream.get_write_available()
+                    logger.info(f"Write available frames: {write_available}")
+                except OSError:
+                    # Not available in callback mode
+                    logger.debug("Write available: N/A (callback mode)")
+
+            logger.info("=" * 60)
+
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Could not log complete stream info: {e}")
+
     def _record_audio(self, filepath: str) -> None:  # noqa: PLR0915 (for now)
         """
         Private method to record audio to file.
@@ -491,8 +574,7 @@ class AudioRecorder:
             )
 
             # Log stream info
-            stream_info = stream.get_stream_info()
-            logger.info(f"Stream info: {stream_info}")
+            self._log_stream_info(stream=stream)
 
             stream.start_stream()
 
@@ -538,67 +620,6 @@ class AudioRecorder:
                     break
 
         logger.info(f"Recording saved to {filepath}")
-
-        # stream = None
-        # wf = None
-
-        # try:
-        #     stream = self.audio.open(
-        #         format=self.format,
-        #         channels=self.channels,
-        #         rate=self.sample_rate,
-        #         input=True,
-        #         input_device_index=self.device_index,
-        #         frames_per_buffer=self.chunk_size,
-        #     )
-
-        #     wf = wave.open(str(filepath), "wb")
-        #     wf.setnchannels(self.channels)
-        #     wf.setsampwidth(self.audio.get_sample_size(self.format))
-        #     wf.setframerate(self.sample_rate)
-
-        #     logger.info("Recording started")
-        #     frame_count = 0
-
-        #     while not self.stop_event.is_set():
-        #         try:
-        #             data = stream.read(self.chunk_size, exception_on_overflow=False)
-        #             wf.writeframes(
-        #                 data
-        #             )  # don't cache to memory, write straight to disk
-        #             frame_count += 1
-        #         except Exception as e:
-        #             logger.error("Encountered error while recording.")
-        #             logger.error(f"Error type: {type(e).__name__}")
-        #             logger.error(f"Error message: {e}")
-        #             logger.error("Stack trace:")
-        #             logger.error(traceback.format_exc())
-        #             break
-
-        #     logger.info(f"Recording stopped, captured {frame_count} frames")
-
-        # except Exception as e:
-        #     logger.error("Encountered error while recording.")
-        #     logger.error(f"Error type: {type(e).__name__}")
-        #     logger.error(f"Error message: {e}")
-        #     logger.error("Stack trace:")
-        #     logger.error(traceback.format_exc())
-        #     return
-        # finally:
-        #     if stream:
-        #         stream.stop_stream()
-        #         stream.close()
-        #     if wf:
-        #         wf.close()
-
-        # logger.info(f"Recording saved to {filepath}")
-
-        # # upload to Dropbox if configured
-        # if self.uploader and settings.dropbox.enabled:
-        #     if settings.dropbox.upload_in_background:
-        #         Thread(target=self._upload_file, args=(filepath,), daemon=True).start()
-        #     else:
-        #         self._upload_file(filepath)
 
     def _upload_file(self, filepath: Path) -> None:
         """
